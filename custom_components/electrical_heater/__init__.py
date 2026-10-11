@@ -58,6 +58,11 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     1. Serve ``frontend/electrical-heater-card.js`` at ``CARD_URL``.
     2. Tell the frontend to load that URL. ``?v=<version>`` makes browsers
        fetch the new file after an update instead of using an old cached copy.
+
+    The file is served with long-lived cache headers. Without them, phones
+    and tablets re-download it when the app wakes from sleep, often before
+    the network is back; the download fails and the card shows an error
+    until the page is reloaded. The versioned URL keeps updates working.
     """
     if hass.http is None:
         # No web server running (e.g. during tests), so nothing to serve.
@@ -65,7 +70,7 @@ async def _async_register_card(hass: HomeAssistant) -> None:
 
     card_path = Path(__file__).parent / "frontend" / CARD_FILENAME
     await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL, str(card_path), cache_headers=False)]
+        [StaticPathConfig(CARD_URL, str(card_path), cache_headers=True)]
     )
 
     if "frontend" in hass.config.components:

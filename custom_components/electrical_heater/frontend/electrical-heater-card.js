@@ -33,7 +33,7 @@
  *   boost_entity:  number entity for boost; found automatically if omitted
  */
 
-const CARD_VERSION = "0.4.0";
+const CARD_VERSION = "0.4.1";
 const INTEGRATION = "electrical_heater";
 
 // Material Design Icons (same icons Home Assistant uses), embedded so the

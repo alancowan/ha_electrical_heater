@@ -278,6 +278,9 @@ async def test_card_is_served(hass: HomeAssistant, hass_client) -> None:
     resp = await client.get("/electrical_heater/electrical-heater-card.js")
     assert resp.status == 200
     assert "customElements.define(\"electrical-heater-card\"" in await resp.text()
+    # Cached by the browser, so the card still loads when a phone wakes up
+    # without network.
+    assert "max-age" in resp.headers.get("Cache-Control", "")
 
 
 async def test_card_added_to_frontend(hass: HomeAssistant) -> None:
