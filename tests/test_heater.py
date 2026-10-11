@@ -268,3 +268,27 @@ async def test_migrate_v1_single_humidity(hass: HomeAssistant) -> None:
     # The options had cleared the humidity sensor; that must stay cleared.
     assert entry.options["humidity_sensors"] == []
     assert hass.states.get(CLIMATE).attributes.get("current_humidity") is None
+
+
+async def test_card_is_served(hass: HomeAssistant, hass_client) -> None:
+    """The dashboard card's JavaScript is served by Home Assistant."""
+    await async_setup_component(hass, "http", {})
+    await _setup(hass)
+    client = await hass_client()
+    resp = await client.get("/electrical_heater/electrical-heater-card.js")
+    assert resp.status == 200
+    assert "customElements.define(\"electrical-heater-card\"" in await resp.text()
+
+
+async def test_card_added_to_frontend(hass: HomeAssistant) -> None:
+    """With the frontend loaded, the card URL (with version) is registered."""
+    from unittest.mock import patch
+
+    await async_setup_component(hass, "http", {})
+    hass.config.components.add("frontend")
+    with patch(
+        "custom_components.electrical_heater.add_extra_js_url"
+    ) as add_js:
+        await _setup(hass)
+    add_js.assert_called_once()
+    assert add_js.call_args.args[1].startswith("/electrical_heater/electrical-heater-card.js?v=")

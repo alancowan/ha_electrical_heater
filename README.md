@@ -59,23 +59,41 @@ All of these can be changed later under **Settings → Devices & services → El
 
 Manual install: copy `custom_components/electrical_heater` into your `config/custom_components/` folder.
 
-## Dashboard
+## Dashboard card
 
-You don't need a custom card. The built-in thermostat card has the + / − buttons, and a
-tile card shows the boost slider. Stack them together:
+The integration includes its own card and loads it automatically. You don't need a separate
+HACS download or a dashboard resource.
+
+Edit a dashboard → **Add card** → search **Electrical Heater Card**, then pick your heater.
+
+- **Title:** tap it to open the heater's details.
+- **Heater icon:** tap it to switch Heat / Off. It's orange with a glow while heating, faded
+  orange when on but warm enough, and grey when off.
+- **Readings:** temperature, humidity, power and CO2 (each can be hidden).
+- **− / +:** change the target. Quick presses are sent as one change.
+- **Boost slider:** runs the heater for up to 60 minutes.
+
+Colours, borders and corners come from your Home Assistant theme.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `entity` | (required) | The heater's climate entity |
+| `name` | heater name | Card title |
+| `icon` | built-in radiator | Icon while on, e.g. `mdi:fire` |
+| `icon_off` | crossed-out radiator, or `icon` in grey | Icon while off |
+| `show_humidity` | `true` | Show the humidity row |
+| `show_power` | `true` | Show the power row |
+| `show_co2` | `true` | Show the CO2 row |
+| `show_boost` | `true` | Show the boost slider |
+| `boost_entity` | found automatically | Boost number entity, only needed in unusual setups |
 
 ```yaml
-type: vertical-stack
-cards:
-  - type: thermostat
-    entity: climate.office_heater
-  - type: tile
-    entity: number.office_heater_boost
-    name: Boost
-    features:
-      - type: numeric-input
-        style: slider
+type: custom:electrical-heater-card
+entity: climate.emmalee_bedroom
+icon: mdi:heat-wave
 ```
+
+After an update, refresh the browser (or the app) once so it loads the new card version.
 
 ## Development
 

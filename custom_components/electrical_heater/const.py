@@ -58,6 +58,10 @@ DEFAULT_MAX_BOOST_MINUTES = 60
 MAX_STALE_HOURS = 24
 MAX_BOOST_MINUTES = 60
 
+# The dashboard card: file in frontend/ and the URL it is served at.
+CARD_FILENAME = "electrical-heater-card.js"
+CARD_URL = f"/{DOMAIN}/{CARD_FILENAME}"
+
 # How often (seconds) the controller re-checks stale sensors, boost expiry and
 # the thermostat logic, even when no sensor has changed.
 UPDATE_INTERVAL_SECONDS = 30

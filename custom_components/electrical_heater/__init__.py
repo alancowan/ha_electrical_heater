@@ -1,27 +1,76 @@
 """Electrical Heater integration for Home Assistant.
 
 Turns a plain switch, one or more temperature sensors and a power sensor into
-a full thermostat (climate entity) with a boost timer.
+a full thermostat (climate entity) with a boost timer, plus a matching
+dashboard card.
 
 This file only handles setup and teardown. The logic lives in
-``controller.py`` and the entities in the platform files.
+``controller.py``, the entities in the platform files and the card in
+``frontend/electrical-heater-card.js``.
 """
 
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
+from homeassistant.components.frontend import add_extra_js_url
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import async_get_integration
 
-from .const import CONF_HUMIDITY_SENSOR_LEGACY, CONF_HUMIDITY_SENSORS, PLATFORMS
+from .const import (
+    CARD_FILENAME,
+    CARD_URL,
+    CONF_HUMIDITY_SENSOR_LEGACY,
+    CONF_HUMIDITY_SENSORS,
+    DOMAIN,
+    PLATFORMS,
+)
 from .controller import HeaterController
 
 _LOGGER = logging.getLogger(__name__)
 
+# Heaters are only set up through the UI, never in configuration.yaml.
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 # A config entry whose runtime_data holds this heater's controller.
 type ElectricalHeaterConfigEntry = ConfigEntry[HeaterController]
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Run once when Home Assistant loads the integration (before any heater).
+
+    Makes the dashboard card available, so nobody has to add it as a
+    dashboard resource by hand.
+    """
+    await _async_register_card(hass)
+    return True
+
+
+async def _async_register_card(hass: HomeAssistant) -> None:
+    """Serve the card's JavaScript file and load it on every dashboard.
+
+    1. Serve ``frontend/electrical-heater-card.js`` at ``CARD_URL``.
+    2. Tell the frontend to load that URL. ``?v=<version>`` makes browsers
+       fetch the new file after an update instead of using an old cached copy.
+    """
+    if hass.http is None:
+        # No web server running (e.g. during tests), so nothing to serve.
+        return
+
+    card_path = Path(__file__).parent / "frontend" / CARD_FILENAME
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(CARD_URL, str(card_path), cache_headers=False)]
+    )
+
+    if "frontend" in hass.config.components:
+        integration = await async_get_integration(hass, DOMAIN)
+        add_extra_js_url(hass, f"{CARD_URL}?v={integration.version}")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ElectricalHeaterConfigEntry) -> bool:
