@@ -1,0 +1,104 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Heater components",
+        "description": "Choose the entities that make up this heater.",
+        "data": {
+          "name": "Name",
+          "heater_switch": "Heater switch",
+          "temperature_sensors": "Temperature sensor(s)",
+          "power_sensor": "Power sensor",
+          "humidity_sensor": "Humidity sensor (optional)",
+          "co2_sensor": "CO2 sensor (optional)"
+        },
+        "data_description": {
+          "heater_switch": "The switch that turns the heater on and off.",
+          "temperature_sensors": "One or more sensors. Usable ones are averaged; a failed or stale one is ignored.",
+          "power_sensor": "Tells whether the heater is actually heating."
+        }
+      },
+      "settings": {
+        "title": "Heater settings",
+        "data": {
+          "min_temp": "Minimum temperature",
+          "max_temp": "Maximum temperature",
+          "temp_step": "Temperature step (+ / - button)",
+          "default_target_temp": "Default target temperature",
+          "cold_tolerance": "Cold tolerance (hysteresis)",
+          "hot_tolerance": "Hot tolerance (hysteresis)",
+          "power_threshold": "Power threshold",
+          "stale_hours": "Sensor stale after",
+          "min_cycle_minutes": "Minimum on/off cycle time",
+          "max_boost_minutes": "Maximum boost time"
+        },
+        "data_description": {
+          "cold_tolerance": "Heater turns on when the temperature drops to target minus this value.",
+          "hot_tolerance": "Heater turns off when the temperature reaches target plus this value.",
+          "power_threshold": "Above this power the heater counts as heating.",
+          "stale_hours": "A temperature sensor that has not reported for this long is ignored (max 24 h).",
+          "min_cycle_minutes": "Minimum time the switch stays on or off before the thermostat changes it again. 0 disables. Mode changes and boost ignore this.",
+          "max_boost_minutes": "Upper limit of the boost slider (max 60 min)."
+        }
+      }
+    },
+    "error": {
+      "max_below_min": "Maximum temperature must be higher than minimum temperature.",
+      "target_out_of_range": "Default target must be between minimum and maximum temperature.",
+      "no_temperature_sensor": "Select at least one temperature sensor."
+    },
+    "abort": {
+      "already_configured": "This switch is already used by another heater."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Heater components",
+        "data": {
+          "heater_switch": "Heater switch",
+          "temperature_sensors": "Temperature sensor(s)",
+          "power_sensor": "Power sensor",
+          "humidity_sensor": "Humidity sensor (optional)",
+          "co2_sensor": "CO2 sensor (optional)"
+        }
+      },
+      "settings": {
+        "title": "Heater settings",
+        "data": {
+          "min_temp": "Minimum temperature",
+          "max_temp": "Maximum temperature",
+          "temp_step": "Temperature step (+ / - button)",
+          "default_target_temp": "Default target temperature",
+          "cold_tolerance": "Cold tolerance (hysteresis)",
+          "hot_tolerance": "Hot tolerance (hysteresis)",
+          "power_threshold": "Power threshold",
+          "stale_hours": "Sensor stale after",
+          "min_cycle_minutes": "Minimum on/off cycle time",
+          "max_boost_minutes": "Maximum boost time"
+        },
+        "data_description": {
+          "cold_tolerance": "Heater turns on when the temperature drops to target minus this value.",
+          "hot_tolerance": "Heater turns off when the temperature reaches target plus this value.",
+          "power_threshold": "Above this power the heater counts as heating.",
+          "stale_hours": "A temperature sensor that has not reported for this long is ignored (max 24 h).",
+          "min_cycle_minutes": "Minimum time the switch stays on or off before the thermostat changes it again. 0 disables. Mode changes and boost ignore this.",
+          "max_boost_minutes": "Upper limit of the boost slider (max 60 min)."
+        }
+      }
+    },
+    "error": {
+      "max_below_min": "Maximum temperature must be higher than minimum temperature.",
+      "target_out_of_range": "Default target must be between minimum and maximum temperature.",
+      "no_temperature_sensor": "Select at least one temperature sensor."
+    }
+  },
+  "entity": {
+    "number": { "boost": { "name": "Boost" } },
+    "sensor": { "temperature": { "name": "Temperature" } },
+    "binary_sensor": {
+      "heating": { "name": "Heating" },
+      "sensor_problem": { "name": "Temperature sensor problem" }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "domain": "electrical_heater",
+  "name": "Electrical Heater",
+  "codeowners": ["@alancowan"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/alancowan/ha_electrical_heater",
+  "integration_type": "helper",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/alancowan/ha_electrical_heater/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
