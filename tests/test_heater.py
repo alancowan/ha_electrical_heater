@@ -292,3 +292,11 @@ async def test_card_added_to_frontend(hass: HomeAssistant) -> None:
         await _setup(hass)
     add_js.assert_called_once()
     assert add_js.call_args.args[1].startswith("/electrical_heater/electrical-heater-card.js?v=")
+
+
+async def test_brand_icon_detected(hass: HomeAssistant) -> None:
+    """Home Assistant finds the integration's own logo in brand/."""
+    from homeassistant.loader import async_get_integration
+
+    integration = await async_get_integration(hass, DOMAIN)
+    assert integration.has_branding
