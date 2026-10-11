@@ -3,7 +3,8 @@
   "name": "Electrical Heater",
   "after_dependencies": [
     "frontend",
-    "http"
+    "http",
+    "lovelace"
   ],
   "codeowners": [
     "@alancowan"
@@ -15,5 +16,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/alancowan/ha_electrical_heater/issues",
   "requirements": [],
-  "version": "0.4.1"
+  "version": "0.4.2"
 }

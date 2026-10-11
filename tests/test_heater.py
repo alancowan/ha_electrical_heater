@@ -283,15 +283,59 @@ async def test_card_is_served(hass: HomeAssistant, hass_client) -> None:
     assert "max-age" in resp.headers.get("Cache-Control", "")
 
 
-async def test_card_added_to_frontend(hass: HomeAssistant) -> None:
-    """With the frontend loaded, the card URL (with version) is registered."""
+async def _resources(hass: HomeAssistant) -> list[dict]:
+    """The dashboard resources as stored by Home Assistant."""
+    resources = hass.data["lovelace"].resources
+    await resources.async_get_info()
+    return resources.async_items()
+
+
+async def test_card_added_as_dashboard_resource(hass: HomeAssistant) -> None:
+    """The card is a dashboard resource (loads after the app reconnects)."""
     from unittest.mock import patch
 
     await async_setup_component(hass, "http", {})
+    await async_setup_component(hass, "lovelace", {})
     hass.config.components.add("frontend")
-    with patch(
-        "custom_components.electrical_heater.add_extra_js_url"
-    ) as add_js:
+    with patch("custom_components.electrical_heater.add_extra_js_url") as add_js:
+        entry = await _setup(hass)
+    add_js.assert_not_called()  # not loaded on page open as well
+
+    items = await _resources(hass)
+    assert len(items) == 1
+    assert items[0]["type"] == "module"
+    assert items[0]["url"].startswith("/electrical_heater/electrical-heater-card.js?v=")
+
+    # Deleting the last heater removes the resource again.
+    await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    assert await _resources(hass) == []
+
+
+async def test_card_resource_updated_to_new_version(hass: HomeAssistant) -> None:
+    """An old version's resource is updated instead of added twice."""
+    await async_setup_component(hass, "http", {})
+    await async_setup_component(hass, "lovelace", {})
+    resources = hass.data["lovelace"].resources
+    await resources.async_get_info()
+    await resources.async_create_item(
+        {"res_type": "module", "url": "/electrical_heater/electrical-heater-card.js?v=0.0.1"}
+    )
+    await _setup(hass)
+
+    items = await _resources(hass)
+    assert len(items) == 1
+    assert not items[0]["url"].endswith("v=0.0.1")
+
+
+async def test_card_yaml_resources_fallback(hass: HomeAssistant) -> None:
+    """With resources in YAML (read-only), the card is loaded as extra JS."""
+    from unittest.mock import patch
+
+    await async_setup_component(hass, "http", {})
+    await async_setup_component(hass, "lovelace", {"lovelace": {"resource_mode": "yaml"}})
+    hass.config.components.add("frontend")
+    with patch("custom_components.electrical_heater.add_extra_js_url") as add_js:
         await _setup(hass)
     add_js.assert_called_once()
     assert add_js.call_args.args[1].startswith("/electrical_heater/electrical-heater-card.js?v=")

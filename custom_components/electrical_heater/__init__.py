@@ -55,14 +55,19 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 async def _async_register_card(hass: HomeAssistant) -> None:
     """Serve the card's JavaScript file and load it on every dashboard.
 
-    1. Serve ``frontend/electrical-heater-card.js`` at ``CARD_URL``.
-    2. Tell the frontend to load that URL. ``?v=<version>`` makes browsers
-       fetch the new file after an update instead of using an old cached copy.
+    1. Serve ``frontend/electrical-heater-card.js`` at ``CARD_URL``, with
+       long-lived cache headers (the URL changes with every version).
+    2. Add it to the dashboard resources (Settings > Dashboards > Resources),
+       the same way HACS adds cards. ``?v=<version>`` makes browsers fetch the
+       new file after an update instead of using an old cached copy.
 
-    The file is served with long-lived cache headers. Without them, phones
-    and tablets re-download it when the app wakes from sleep, often before
-    the network is back; the download fails and the card shows an error
-    until the page is reloaded. The versioned URL keeps updates working.
+    Why resources and not ``add_extra_js_url``: extra JS is loaded as soon as
+    the page opens. When a phone or tablet wakes up, the app reopens the page
+    from its offline copy before the network is back, that download fails and
+    the browser won't retry it, so every card shows "Custom element doesn't
+    exist". Dashboard resources are loaded only once the connection to Home
+    Assistant is up. ``add_extra_js_url`` is kept as a fallback for setups
+    whose resources are managed in YAML.
     """
     if hass.http is None:
         # No web server running (e.g. during tests), so nothing to serve.
@@ -73,9 +78,70 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         [StaticPathConfig(CARD_URL, str(card_path), cache_headers=True)]
     )
 
+    integration = await async_get_integration(hass, DOMAIN)
+    url = f"{CARD_URL}?v={integration.version}"
+
+    if await _async_add_card_resource(hass, url):
+        return
     if "frontend" in hass.config.components:
-        integration = await async_get_integration(hass, DOMAIN)
-        add_extra_js_url(hass, f"{CARD_URL}?v={integration.version}")
+        _LOGGER.info(
+            "Dashboard resources are managed in YAML; add %s as a module resource "
+            "for the card to load reliably on phones",
+            url,
+        )
+        add_extra_js_url(hass, url)
+
+
+def _card_resources(hass: HomeAssistant) -> Any:
+    """The dashboard resources collection, if it can be edited (storage mode).
+
+    Returns None when Lovelace isn't loaded or resources are kept in YAML.
+    """
+    lovelace = hass.data.get("lovelace")
+    if lovelace is None:
+        return None
+    # A dataclass in recent Home Assistant versions, a dict in older ones.
+    resources = (
+        lovelace.get("resources") if isinstance(lovelace, dict) else getattr(lovelace, "resources", None)
+    )
+    if resources is None or not hasattr(resources, "async_create_item"):
+        return None  # YAML resources: read-only
+    return resources
+
+
+async def _async_add_card_resource(hass: HomeAssistant, url: str) -> bool:
+    """Add (or update to this version) the card's dashboard resource.
+
+    Returns False if resources can't be edited, so the caller can fall back.
+    """
+    if (resources := _card_resources(hass)) is None:
+        return False
+    await resources.async_get_info()  # makes sure the stored list is loaded
+
+    ours = [r for r in resources.async_items() if r["url"].startswith(CARD_URL)]
+    if not ours:
+        await resources.async_create_item({"res_type": "module", "url": url})
+        _LOGGER.debug("Added dashboard resource %s", url)
+        return True
+
+    # Keep one entry, pointing at the current version; drop any duplicates.
+    first, *extra = ours
+    if first["url"] != url:
+        await resources.async_update_item(first["id"], {"res_type": "module", "url": url})
+    for item in extra:
+        await resources.async_delete_item(item["id"])
+    return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """When the last heater is deleted, remove the card's dashboard resource."""
+    remaining = [e for e in hass.config_entries.async_entries(DOMAIN) if e.entry_id != entry.entry_id]
+    if remaining or (resources := _card_resources(hass)) is None:
+        return
+    await resources.async_get_info()
+    for item in list(resources.async_items()):
+        if item["url"].startswith(CARD_URL):
+            await resources.async_delete_item(item["id"])
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ElectricalHeaterConfigEntry) -> bool:

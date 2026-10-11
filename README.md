@@ -64,8 +64,10 @@ Manual install: copy `custom_components/electrical_heater` into your `config/cus
 
 ## Dashboard card
 
-The integration includes its own card and loads it automatically. You don't need a separate
-HACS download or a dashboard resource.
+The integration includes its own card and adds it to your dashboard resources automatically
+(Settings → Dashboards → ⋮ → Resources). You don't need a separate HACS download. If your
+resources are managed in YAML, add `/electrical_heater/electrical-heater-card.js` there as a
+`module` resource yourself.
 
 Edit a dashboard → **Add card** → search **Electrical Heater Card**, then pick your heater.
 
