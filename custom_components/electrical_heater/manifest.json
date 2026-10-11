@@ -5,9 +5,9 @@
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/alancowan/ha_electrical_heater",
-  "integration_type": "helper",
+  "integration_type": "device",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/alancowan/ha_electrical_heater/issues",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.1.1"
 }
