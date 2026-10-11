@@ -7,14 +7,14 @@
         "data": {
           "name": "Name",
           "heater_switch": "Heater switch",
-          "temperature_sensors": "Temperature sensor(s)",
+          "temperature_sensors": "Temperature sensor(s) (optional)",
           "power_sensor": "Power sensor",
           "humidity_sensors": "Humidity sensor(s) (optional)",
           "co2_sensor": "CO2 sensor (optional)"
         },
         "data_description": {
           "heater_switch": "The switch that turns the heater on and off.",
-          "temperature_sensors": "One or more sensors. Usable ones are averaged; a failed or stale one is ignored.",
+          "temperature_sensors": "Usable sensors are averaged; a failed or stale one is ignored. Leave empty to run the heater only with the boost slider.",
           "power_sensor": "Tells whether the heater is actually heating.",
           "humidity_sensors": "Zero or more sensors. Averaged like temperature, using the same stale time."
         }
@@ -39,14 +39,13 @@
           "power_threshold": "Above this power the heater counts as heating.",
           "stale_hours": "A temperature or humidity sensor that has not reported for this long is ignored (max 24 h).",
           "min_cycle_minutes": "Minimum time the switch stays on or off before the thermostat changes it again. 0 disables. Mode changes and boost ignore this.",
-          "max_boost_minutes": "Upper limit of the boost slider (max 60 min)."
+          "max_boost_minutes": "Upper limit of the boost slider (max 1440 min = 24 h)."
         }
       }
     },
     "error": {
       "max_below_min": "Maximum temperature must be higher than minimum temperature.",
-      "target_out_of_range": "Default target must be between minimum and maximum temperature.",
-      "no_temperature_sensor": "Select at least one temperature sensor."
+      "target_out_of_range": "Default target must be between minimum and maximum temperature."
     },
     "abort": {
       "already_configured": "This switch is already used by another heater."
@@ -58,13 +57,14 @@
         "title": "Heater components",
         "data": {
           "heater_switch": "Heater switch",
-          "temperature_sensors": "Temperature sensor(s)",
+          "temperature_sensors": "Temperature sensor(s) (optional)",
           "power_sensor": "Power sensor",
           "humidity_sensors": "Humidity sensor(s) (optional)",
           "co2_sensor": "CO2 sensor (optional)"
         },
         "data_description": {
-          "humidity_sensors": "Zero or more sensors. Averaged like temperature, using the same stale time."
+          "humidity_sensors": "Zero or more sensors. Averaged like temperature, using the same stale time.",
+          "temperature_sensors": "Usable sensors are averaged; a failed or stale one is ignored. Leave empty to run the heater only with the boost slider."
         }
       },
       "settings": {
@@ -87,14 +87,13 @@
           "power_threshold": "Above this power the heater counts as heating.",
           "stale_hours": "A temperature or humidity sensor that has not reported for this long is ignored (max 24 h).",
           "min_cycle_minutes": "Minimum time the switch stays on or off before the thermostat changes it again. 0 disables. Mode changes and boost ignore this.",
-          "max_boost_minutes": "Upper limit of the boost slider (max 60 min)."
+          "max_boost_minutes": "Upper limit of the boost slider (max 1440 min = 24 h)."
         }
       }
     },
     "error": {
       "max_below_min": "Maximum temperature must be higher than minimum temperature.",
-      "target_out_of_range": "Default target must be between minimum and maximum temperature.",
-      "no_temperature_sensor": "Select at least one temperature sensor."
+      "target_out_of_range": "Default target must be between minimum and maximum temperature."
     }
   },
   "entity": {

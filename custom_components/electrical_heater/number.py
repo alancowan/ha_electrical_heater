@@ -26,19 +26,21 @@ async def async_setup_entry(
 
 
 class ElectricalHeaterBoost(ElectricalHeaterEntity, NumberEntity):
-    """Slider from 0 to the max boost time (up to 60 minutes)."""
+    """Slider from 0 to the max boost time (up to 24 hours)."""
 
     _attr_translation_key = "boost"
     _attr_icon = "mdi:fire-circle"
     _attr_mode = NumberMode.SLIDER  # show as a slider, not an input box
     _attr_native_min_value = 0
-    _attr_native_step = 1
     _attr_native_unit_of_measurement = UnitOfTime.MINUTES
 
     def __init__(self, controller) -> None:
         """Set the slider's maximum from the configured max boost time."""
         super().__init__(controller, "boost")
         self._attr_native_max_value = controller.max_boost_minutes
+        # 1-minute steps up to 2 hours; 5-minute steps for longer boosts so a
+        # long slider stays easy to set.
+        self._attr_native_step = 1 if controller.max_boost_minutes <= 120 else 5
 
     @property
     def native_value(self) -> int:

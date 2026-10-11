@@ -113,7 +113,9 @@ class HeaterController:
 
         # Component entities
         self.switch_entity: str = conf[CONF_HEATER_SWITCH]
-        self.temp_sensors: list[str] = list(conf[CONF_TEMP_SENSORS])
+        # Temperature sensors are optional. Without any, there is no thermostat:
+        # the heater only runs during a boost (see has_thermostat).
+        self.temp_sensors: list[str] = list(conf.get(CONF_TEMP_SENSORS) or [])
         self.power_sensor: str | None = conf.get(CONF_POWER_SENSOR) or None
         self.humidity_sensors: list[str] = list(conf.get(CONF_HUMIDITY_SENSORS) or [])
         self.co2_sensor: str | None = conf.get(CONF_CO2_SENSOR) or None
@@ -156,6 +158,9 @@ class HeaterController:
         self._lock = asyncio.Lock()  # prevents two control runs at the same time
         self._restored = False  # True once the climate entity restored its state
         self._started = False  # True once Home Assistant has fully started
+        # Set when the switch must be forced into the right state as soon as
+        # switching is allowed (see async_restore).
+        self._force_pending = False
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -194,6 +199,15 @@ class HeaterController:
         self._unsubs.clear()
         self._cancel_boost_timer()
 
+    @property
+    def has_thermostat(self) -> bool:
+        """True if temperature sensors are configured.
+
+        Without them the heater can't regulate a temperature: the only mode is
+        OFF and the heater runs only while a boost is active.
+        """
+        return bool(self.temp_sensors)
+
     @callback
     def async_restore(self, hvac_mode: HVACMode | None, target: float | None) -> None:
         """Receive the values remembered from before a restart.
@@ -203,6 +217,11 @@ class HeaterController:
         """
         if hvac_mode in (HVACMode.HEAT, HVACMode.OFF):
             self.hvac_mode = hvac_mode
+        if not self.has_thermostat and self.hvac_mode == HVACMode.HEAT:
+            # The temperature sensors were removed while heating. Switch to OFF
+            # and make sure the heater is really turned off, not left running.
+            self.hvac_mode = HVACMode.OFF
+            self._force_pending = True
         if target is not None:
             self.target_temperature = self._clamp(target)
         self._restored = True
@@ -397,7 +416,9 @@ class HeaterController:
     # ------------------------------------------------------------------
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
-        """Switch between HEAT and OFF."""
+        """Switch between HEAT and OFF (only OFF without temperature sensors)."""
+        if hvac_mode == HVACMode.HEAT and not self.has_thermostat:
+            return
         self.hvac_mode = hvac_mode
         # force=True: turning the mode off must switch the heater off immediately,
         # ignoring the minimum cycle time.
@@ -473,7 +494,8 @@ class HeaterController:
             # Don't switch anything until HA has started and the previous
             # mode/target have been restored.
             if self._started and self._restored:
-                await self._async_apply_switch(force)
+                await self._async_apply_switch(force or self._force_pending)
+                self._force_pending = False
 
         self._notify()
 

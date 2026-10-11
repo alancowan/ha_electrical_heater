@@ -9,10 +9,12 @@
  *   │                💧 65.2%      │
  *   │                ⚡ 824.1W     │
  *   │ ┌──────────────────────────┐ │
- *   │ │  −        25.0        +  │ │  target temperature
+ *   │ │  −        25.0        +  │ │  target temperature (hidden for a
+ *   │ │                          │ │  heater without temperature sensors)
  *   │ └──────────────────────────┘ │
  *   │ ┌──────────────────────────┐ │
- *   │ │ 🔥 Boost ───●──── 15 min │ │  boost slider (optional)
+ *   │ │ 🔥 Boost ─────●───────── │ │  boost slider (optional); the label
+ *   │ │                          │ │  shows the minutes left while boosting
  *   │ └──────────────────────────┘ │
  *   └──────────────────────────────┘
  *
@@ -31,7 +33,7 @@
  *   boost_entity:  number entity for boost; found automatically if omitted
  */
 
-const CARD_VERSION = "0.3.0";
+const CARD_VERSION = "0.4.0";
 const INTEGRATION = "electrical_heater";
 
 // Material Design Icons (same icons Home Assistant uses), embedded so the
@@ -135,7 +137,9 @@ const STYLE = `
     border-radius: 50%;
     transition: background-color 0.2s;
   }
-  .heater:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+  .heater:not(:disabled):hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+  /* Boost-only heater (no temperature sensors): the icon is not a button. */
+  .heater:disabled { cursor: default; }
   /* .heater-icon is either the built-in <svg> or an <ha-icon> (custom icon). */
   .heater-icon {
     display: block;
@@ -205,26 +209,27 @@ const STYLE = `
   .target-value.pending { opacity: 0.6; }
   .target-value.mode-off { color: var(--secondary-text-color, #727272); font-weight: 500; }
 
-  .boost[hidden] { display: none; }
+  .bar[hidden] { display: none; }
   .boost-icon { width: 20px; height: 20px; margin-left: 6px; flex: none; color: var(--secondary-text-color, #727272); }
   .boost.active .boost-icon { color: var(--state-climate-heat-color, #ff8100); }
-  .boost-label { font-size: 0.95rem; flex: none; }
+  /* The label reads "Boost", or the minutes left ("15 min") while boosting.
+     A fixed width stops the slider from jumping when the text changes. */
+  .boost-label {
+    flex: none;
+    min-width: 3.6em;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .boost.active .boost-label { font-weight: 600; }
+  /* The slider takes all remaining width, so it stays usable on phones. */
   .boost input {
     flex: 1;
     min-width: 0;
+    margin: 0 8px 0 0;
     accent-color: var(--state-climate-heat-color, #ff8100);
     cursor: pointer;
   }
-  .boost-value {
-    flex: none;
-    min-width: 52px;
-    text-align: right;
-    padding-right: 8px;
-    font-size: 0.95rem;
-    font-variant-numeric: tabular-nums;
-    color: var(--secondary-text-color, #727272);
-  }
-  .boost.active .boost-value { color: var(--primary-text-color, #212121); font-weight: 600; }
 
   .warning {
     padding: 16px;
@@ -376,7 +381,6 @@ class ElectricalHeaterCard extends HTMLElement {
             ${svg(ICONS.fire, "boost-icon")}
             <label class="boost-label" for="boost">Boost</label>
             <input id="boost" type="range" min="0" max="60" step="1" value="0" />
-            <span class="boost-value"></span>
           </div>
         </div>
       </ha-card>
@@ -398,7 +402,8 @@ class ElectricalHeaterCard extends HTMLElement {
       target: $(".target-value"),
       boost: $(".boost"),
       slider: $("#boost"),
-      boostValue: $(".boost-value"),
+      boostLabel: $(".boost-label"),
+      targetBar: $(".bar.target"),
     };
 
     this._el.title.addEventListener("click", () => this._moreInfo(this._config.entity));
@@ -448,11 +453,21 @@ class ElectricalHeaterCard extends HTMLElement {
     const look = action === "heating" ? "heating" : mode === "heat" || action === "idle" ? "idle" : "off";
     el.heater.className = `heater ${look}`;
     this._setHeaterIcon(look === "off");
-    el.heater.setAttribute(
-      "aria-label",
-      mode === "heat" ? "Heater is on. Turn off" : "Heater is off. Turn on"
-    );
-    el.heater.title = mode === "heat" ? "Tap to turn off" : "Tap to turn on";
+
+    // Without temperature sensors the heater has no Heat mode (boost only),
+    // so tapping the icon can't switch it on.
+    const canHeat = (a.hvac_modes || []).includes("heat");
+    el.heater.disabled = !canHeat;
+    if (canHeat) {
+      el.heater.setAttribute(
+        "aria-label",
+        mode === "heat" ? "Heater is on. Turn off" : "Heater is off. Turn on"
+      );
+      el.heater.title = mode === "heat" ? "Tap to turn off" : "Tap to turn on";
+    } else {
+      el.heater.setAttribute("aria-label", look === "off" ? "Heater is off" : "Heater is boosting");
+      el.heater.title = "Use Boost to run the heater";
+    }
 
     // Readings. Each row is hidden when switched off in the card options
     // or when the heater has no such sensor.
@@ -461,7 +476,9 @@ class ElectricalHeaterCard extends HTMLElement {
     this._setReading(el.power, this._config.show_power, a.power, 1, "W");
     this._setReading(el.co2, this._config.show_co2, a.co2, 0, " ppm");
 
-    // Target temperature bar
+    // Target temperature bar. Hidden when the heater has no target
+    // temperature (no temperature sensors configured).
+    el.targetBar.hidden = a.temperature === undefined || a.temperature === null;
     const target = this._pendingTarget ?? Number(a.temperature);
     el.target.textContent = Number.isFinite(target) ? this._fmt(target, 1) : "–";
     el.target.classList.toggle("pending", this._pendingTarget !== null);
@@ -475,7 +492,10 @@ class ElectricalHeaterCard extends HTMLElement {
     const boostObj = boostId ? this._hass.states[boostId] : null;
     el.boost.hidden = !this._config.show_boost || !boostObj;
     if (boostObj) {
-      el.slider.max = String(boostObj.attributes.max ?? 60);
+      const max = Number(boostObj.attributes.max ?? 60);
+      el.slider.max = String(max);
+      // Room for "23h 55m" when boosts can be longer than an hour.
+      el.boostLabel.style.minWidth = max > 60 ? "4.6em" : "";
       el.slider.step = String(boostObj.attributes.step ?? 1);
       if (!this._sliderActive) {
         const minutes = Number(boostObj.state) || 0;
@@ -519,11 +539,19 @@ class ElectricalHeaterCard extends HTMLElement {
     li.querySelector("span").textContent = Number.isFinite(num) ? `${this._fmt(num, decimals)}${unit}` : "–";
   }
 
-  /** Show the boost value next to the slider. */
+  /** Show "Boost", or the time left while a boost runs, beside the slider. */
   _showBoost(minutes) {
     this._el.boost.classList.toggle("active", minutes > 0);
-    this._el.boostValue.textContent = minutes > 0 ? `${minutes} min` : "Off";
+    this._el.boostLabel.textContent = minutes > 0 ? this._fmtDuration(minutes) : "Boost";
     this._el.slider.setAttribute("aria-valuetext", minutes > 0 ? `${minutes} minutes` : "Off");
+  }
+
+  /** 45 -> "45 min", 60 -> "1h", 90 -> "1h 30m", 1440 -> "24h". */
+  _fmtDuration(minutes) {
+    if (minutes < 60) return `${minutes} min`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m ? `${h}h ${m}m` : `${h}h`;
   }
 
   // ------------------------------------------------------------------
@@ -533,7 +561,7 @@ class ElectricalHeaterCard extends HTMLElement {
   /** Tap on the radiator: switch between Heat and Off. */
   _toggleMode() {
     const stateObj = this._hass.states[this._config.entity];
-    if (!stateObj) return;
+    if (!stateObj || !(stateObj.attributes.hvac_modes || []).includes("heat")) return;
     this._hass.callService("climate", "set_hvac_mode", {
       entity_id: this._config.entity,
       hvac_mode: stateObj.state === "heat" ? "off" : "heat",

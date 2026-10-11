@@ -61,7 +61,7 @@ from .const import (
 # Optional entities. When the user clears one of these in the options form the
 # key is missing from the input, so we store an explicit "empty" value to
 # remove it: an empty list for multi-select fields, None for single ones.
-OPTIONAL_MULTI_ENTITIES = (CONF_HUMIDITY_SENSORS,)
+OPTIONAL_MULTI_ENTITIES = (CONF_TEMP_SENSORS, CONF_HUMIDITY_SENSORS)
 OPTIONAL_SINGLE_ENTITIES = (CONF_CO2_SENSOR,)
 
 
@@ -103,8 +103,9 @@ def components_schema(include_name: bool) -> vol.Schema:
             vol.Required(CONF_HEATER_SWITCH): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain=["switch", "input_boolean", "light"])
             ),
-            # One or more temperature sensors; their average is used.
-            vol.Required(CONF_TEMP_SENSORS): _sensor_selector(
+            # Zero or more temperature sensors; their average is used.
+            # Without any, the heater can only be run with the boost slider.
+            vol.Optional(CONF_TEMP_SENSORS): _sensor_selector(
                 SensorDeviceClass.TEMPERATURE, multiple=True
             ),
             # Power sensor that tells whether the heater is really heating.
@@ -161,14 +162,6 @@ def validate_settings(user_input: dict[str, Any]) -> dict[str, str]:
     return errors
 
 
-def validate_components(user_input: dict[str, Any]) -> dict[str, str]:
-    """Check the chosen entities. Returns {field: error_key}."""
-    errors: dict[str, str] = {}
-    if not user_input.get(CONF_TEMP_SENSORS):
-        errors[CONF_TEMP_SENSORS] = "no_temperature_sensor"
-    return errors
-
-
 def normalise_components(user_input: dict[str, Any]) -> dict[str, Any]:
     """Store cleared optional sensors as [] / None so they really get removed."""
     data = dict(user_input)
@@ -196,10 +189,8 @@ class ElectricalHeaterConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             # Don't allow the same switch to be used by two heaters.
             self._async_abort_entries_match({CONF_HEATER_SWITCH: user_input[CONF_HEATER_SWITCH]})
-            errors = validate_components(user_input)
-            if not errors:
-                self._components = normalise_components(user_input)
-                return await self.async_step_settings()
+            self._components = normalise_components(user_input)
+            return await self.async_step_settings()
 
         schema = self.add_suggested_values_to_schema(components_schema(include_name=True), user_input or {})
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
@@ -242,10 +233,8 @@ class ElectricalHeaterOptionsFlow(OptionsFlow):
         """Step 1: change the component entities."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            errors = validate_components(user_input)
-            if not errors:
-                self._components = normalise_components(user_input)
-                return await self.async_step_settings()
+            self._components = normalise_components(user_input)
+            return await self.async_step_settings()
 
         schema = self.add_suggested_values_to_schema(
             components_schema(include_name=False), user_input or self._current

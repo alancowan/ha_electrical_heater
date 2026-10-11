@@ -2,7 +2,8 @@
 
 * Heating - on while the power sensor shows the heater drawing power.
 * Temperature sensor problem - on when any temperature sensor is stale or
-  unavailable, so you can build an alert automation on it.
+  unavailable, so you can build an alert automation on it. Only exists
+  when temperature sensors are configured.
 """
 
 from __future__ import annotations
@@ -11,12 +12,12 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.const import EntityCategory
+from homeassistant.const import EntityCategory, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ElectricalHeaterConfigEntry
-from .entity import ElectricalHeaterEntity
+from .entity import ElectricalHeaterEntity, remove_unused_entity
 
 
 async def async_setup_entry(
@@ -24,11 +25,16 @@ async def async_setup_entry(
     entry: ElectricalHeaterConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Create both binary sensors for this heater."""
+    """Create the binary sensors for this heater."""
     controller = entry.runtime_data
-    async_add_entities(
-        [ElectricalHeaterHeating(controller), ElectricalHeaterSensorProblem(controller)]
-    )
+    entities: list[BinarySensorEntity] = [ElectricalHeaterHeating(controller)]
+
+    if controller.temp_sensors:
+        entities.append(ElectricalHeaterSensorProblem(controller))
+    else:
+        remove_unused_entity(hass, entry, Platform.BINARY_SENSOR, "sensor_problem")
+
+    async_add_entities(entities)
 
 
 class ElectricalHeaterHeating(ElectricalHeaterEntity, BinarySensorEntity):

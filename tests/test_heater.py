@@ -300,3 +300,120 @@ async def test_brand_icon_detected(hass: HomeAssistant) -> None:
 
     integration = await async_get_integration(hass, DOMAIN)
     assert integration.has_branding
+
+
+async def _setup_boost_only(hass: HomeAssistant, **settings) -> MockConfigEntry:
+    """A heater without temperature sensors (boost only)."""
+    await async_setup_component(hass, "homeassistant", {})
+    await async_setup_component(hass, "input_boolean", {"input_boolean": {"heater": None}})
+    hass.states.async_set(POWER, "0")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=2,
+        title="Office heater",
+        data={
+            "heater_switch": SWITCH,
+            "temperature_sensors": [],
+            "power_sensor": POWER,
+            "humidity_sensors": [],
+            "co2_sensor": None,
+            **{**SETTINGS, **settings},
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
+
+
+async def test_config_flow_without_temperature_sensor(hass: HomeAssistant) -> None:
+    """The temperature sensor can be left empty; 24 h boost is allowed."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"name": "Office heater", "heater_switch": SWITCH, "power_sensor": POWER},
+    )
+    assert result["step_id"] == "settings"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**SETTINGS, "max_boost_minutes": 1440.0}
+    )
+    assert result["type"] == "create_entry"
+    assert result["data"]["temperature_sensors"] == []
+    assert result["data"]["max_boost_minutes"] == 1440.0
+
+
+async def test_settings_form_defaults(hass: HomeAssistant) -> None:
+    """New heaters default to a 10 °C target and a 60 min boost limit."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"name": "Office heater", "heater_switch": SWITCH, "power_sensor": POWER},
+    )
+    defaults = {
+        str(key): key.default() for key in result["data_schema"].schema if callable(key.default)
+    }
+    assert defaults["default_target_temp"] == 10.0
+    assert defaults["max_boost_minutes"] == 60
+
+
+async def test_boost_only_heater(hass: HomeAssistant, freezer) -> None:
+    """Without temperature sensors only OFF exists and boost runs the heater."""
+    import pytest
+    from homeassistant.exceptions import ServiceValidationError
+
+    await _setup_boost_only(hass, max_boost_minutes=1440.0)
+    state = hass.states.get(CLIMATE)
+    assert state.state == "off"
+    assert state.attributes["hvac_modes"] == ["off"]
+    assert state.attributes.get("temperature") is None
+    assert hass.states.get("sensor.office_heater_temperature") is None
+    assert hass.states.get("binary_sensor.office_heater_temperature_sensor_problem") is None
+
+    # HEAT is not offered
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            "climate", "set_hvac_mode", {"entity_id": CLIMATE, "hvac_mode": "heat"}, blocking=True
+        )
+
+    # Boost slider goes up to 24 h in 5-minute steps
+    boost = hass.states.get(BOOST)
+    assert boost.attributes["max"] == 1440
+    assert boost.attributes["step"] == 5
+
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": BOOST, "value": 120}, blocking=True
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get(SWITCH).state == "on"
+
+    freezer.tick(timedelta(minutes=120, seconds=1))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get(SWITCH).state == "off"
+
+
+async def test_options_remove_temperature_sensors(hass: HomeAssistant) -> None:
+    """Removing all temperature sensors turns a heating thermostat off."""
+    entry = await _setup(hass)
+    await _set_mode(hass, "heat")
+    assert hass.states.get(SWITCH).state == "on"
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"heater_switch": SWITCH, "power_sensor": POWER}
+    )
+    result = await hass.config_entries.options.async_configure(result["flow_id"], SETTINGS)
+    assert result["type"] == "create_entry"
+    await hass.async_block_till_done()
+
+    state = hass.states.get(CLIMATE)
+    assert state.state == "off"
+    assert state.attributes["hvac_modes"] == ["off"]
+    # The heater must not keep running without a thermostat.
+    assert hass.states.get(SWITCH).state == "off"
+    assert hass.states.get("sensor.office_heater_temperature") is None
+    assert hass.states.get("binary_sensor.office_heater_temperature_sensor_problem") is None

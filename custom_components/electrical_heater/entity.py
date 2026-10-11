@@ -1,6 +1,7 @@
 """Base class shared by every entity of this integration.
 
-It does two things so the individual entities don't have to:
+It does two things so the individual entities don't have to (plus a
+helper, remove_unused_entity, for entities a heater no longer needs):
 
 * puts all entities on one device (named after the heater), and
 * refreshes the entity whenever the controller reports a change.
@@ -8,6 +9,10 @@ It does two things so the individual entities don't have to:
 
 from __future__ import annotations
 
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
@@ -43,3 +48,17 @@ class ElectricalHeaterEntity(Entity):
         await super().async_added_to_hass()
         # async_on_remove makes sure the listener is removed with the entity.
         self.async_on_remove(self.controller.async_add_listener(self.async_write_ha_state))
+
+
+def remove_unused_entity(
+    hass: HomeAssistant, entry: ConfigEntry, platform: Platform, key: str
+) -> None:
+    """Delete an entity this heater no longer creates.
+
+    Used when optional sensors are removed in the options (e.g. no more
+    humidity sensors), so the old entity doesn't linger as "unavailable".
+    ``key`` is the same key the entity was created with.
+    """
+    registry = er.async_get(hass)
+    if entity_id := registry.async_get_entity_id(platform, DOMAIN, f"{entry.entry_id}_{key}"):
+        registry.async_remove(entity_id)

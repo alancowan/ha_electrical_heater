@@ -15,7 +15,6 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import PERCENTAGE, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ElectricalHeaterConfigEntry
@@ -26,10 +25,9 @@ from .const import (
     ATTR_STALE_SENSORS,
     ATTR_UNAVAILABLE_HUMIDITY_SENSORS,
     ATTR_UNAVAILABLE_SENSORS,
-    DOMAIN,
 )
 from .controller import HeaterController
-from .entity import ElectricalHeaterEntity
+from .entity import ElectricalHeaterEntity, remove_unused_entity
 
 
 async def async_setup_entry(
@@ -39,21 +37,21 @@ async def async_setup_entry(
 ) -> None:
     """Create the combined sensors for this heater.
 
-    The humidity sensor only exists when humidity sensors are configured.
-    If they were removed in the options, the old entity is deleted too, so
-    it doesn't linger as "unavailable".
+    Each one only exists when its sensors are configured. If they were
+    removed in the options, the old entity is deleted too.
     """
     controller = entry.runtime_data
-    entities: list[SensorEntity] = [ElectricalHeaterTemperature(controller)]
+    entities: list[SensorEntity] = []
+
+    if controller.temp_sensors:
+        entities.append(ElectricalHeaterTemperature(controller))
+    else:
+        remove_unused_entity(hass, entry, Platform.SENSOR, "temperature")
 
     if controller.humidity_sensors:
         entities.append(ElectricalHeaterHumidity(controller))
     else:
-        registry = er.async_get(hass)
-        if entity_id := registry.async_get_entity_id(
-            Platform.SENSOR, DOMAIN, f"{entry.entry_id}_humidity"
-        ):
-            registry.async_remove(entity_id)
+        remove_unused_entity(hass, entry, Platform.SENSOR, "humidity")
 
     async_add_entities(entities)
 

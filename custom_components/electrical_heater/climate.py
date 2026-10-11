@@ -61,6 +61,11 @@ class ElectricalHeaterClimate(ElectricalHeaterEntity, ClimateEntity, RestoreEnti
     def __init__(self, controller) -> None:
         """Set up the entity and copy the fixed limits from the configuration."""
         super().__init__(controller, "climate")
+        if not controller.has_thermostat:
+            # No temperature sensors: no HEAT mode and no target temperature
+            # (so no + / -). The heater only runs via the boost slider.
+            self._attr_hvac_modes = [HVACMode.OFF]
+            self._attr_supported_features = ClimateEntityFeature.TURN_OFF
         self._attr_temperature_unit = controller.hass.config.units.temperature_unit
         self._attr_min_temp = controller.min_temp
         self._attr_max_temp = controller.max_temp
@@ -112,8 +117,10 @@ class ElectricalHeaterClimate(ElectricalHeaterEntity, ClimateEntity, RestoreEnti
         return self.controller.temperature.value
 
     @property
-    def target_temperature(self) -> float:
-        """The temperature the thermostat is aiming for."""
+    def target_temperature(self) -> float | None:
+        """The temperature the thermostat is aiming for (None without sensors)."""
+        if not self.controller.has_thermostat:
+            return None
         return self.controller.target_temperature
 
     @property
