@@ -24,7 +24,9 @@ PLATFORMS: list[Platform] = [
 CONF_HEATER_SWITCH = "heater_switch"
 CONF_TEMP_SENSORS = "temperature_sensors"
 CONF_POWER_SENSOR = "power_sensor"
-CONF_HUMIDITY_SENSOR = "humidity_sensor"
+CONF_HUMIDITY_SENSORS = "humidity_sensors"
+# Old single-sensor key (config version 1). Only used to migrate old entries.
+CONF_HUMIDITY_SENSOR_LEGACY = "humidity_sensor"
 CONF_CO2_SENSOR = "co2_sensor"
 
 # Behaviour settings
@@ -67,3 +69,7 @@ ATTR_BOOST_ACTIVE = "boost_active"
 ATTR_POWER = "power"
 ATTR_ACTIVE_SENSORS = "active_temperature_sensors"
 ATTR_STALE_SENSORS = "stale_temperature_sensors"
+ATTR_UNAVAILABLE_SENSORS = "unavailable_temperature_sensors"
+ATTR_ACTIVE_HUMIDITY_SENSORS = "active_humidity_sensors"
+ATTR_STALE_HUMIDITY_SENSORS = "stale_humidity_sensors"
+ATTR_UNAVAILABLE_HUMIDITY_SENSORS = "unavailable_humidity_sensors"

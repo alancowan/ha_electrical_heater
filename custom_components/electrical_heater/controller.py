@@ -4,6 +4,7 @@ One ``HeaterController`` exists per configured heater. It:
 
 * watches the temperature / power / humidity / CO2 sensors and the switch,
 * combines the temperature sensors into one value (average of fresh ones),
+  and does the same for the humidity sensors,
 * decides whether the heater switch should be on or off (thermostat logic
   with hysteresis, boost timer, safety shut-off),
 * tells all entities (climate, boost slider, sensors) when something changed.
@@ -55,7 +56,7 @@ from .const import (
     CONF_DEFAULT_TARGET,
     CONF_HEATER_SWITCH,
     CONF_HOT_TOLERANCE,
-    CONF_HUMIDITY_SENSOR,
+    CONF_HUMIDITY_SENSORS,
     CONF_MAX_BOOST_MINUTES,
     CONF_MAX_TEMP,
     CONF_MIN_CYCLE_MINUTES,
@@ -82,8 +83,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
-class TemperatureReading:
-    """Result of combining all temperature sensors into one value.
+class SensorReading:
+    """Result of combining several sensors (temperature or humidity) into one value.
 
     ``value`` is None when no sensor delivered a usable reading.
     ``active`` lists the sensors that were used for the average,
@@ -114,7 +115,7 @@ class HeaterController:
         self.switch_entity: str = conf[CONF_HEATER_SWITCH]
         self.temp_sensors: list[str] = list(conf[CONF_TEMP_SENSORS])
         self.power_sensor: str | None = conf.get(CONF_POWER_SENSOR) or None
-        self.humidity_sensor: str | None = conf.get(CONF_HUMIDITY_SENSOR) or None
+        self.humidity_sensors: list[str] = list(conf.get(CONF_HUMIDITY_SENSORS) or [])
         self.co2_sensor: str | None = conf.get(CONF_CO2_SENSOR) or None
 
         # Behaviour settings (fall back to defaults if missing)
@@ -145,7 +146,8 @@ class HeaterController:
             float(conf.get(CONF_DEFAULT_TARGET, DEFAULT_TARGET_TEMP))
         )
         self.boost_until: datetime | None = None
-        self.temperature = TemperatureReading()
+        self.temperature = SensorReading()
+        self.humidity_reading = SensorReading()
 
         # Internal bookkeeping
         self._listeners: list[CALLBACK_TYPE] = []  # entity refresh callbacks
@@ -165,12 +167,8 @@ class HeaterController:
         Called once from ``__init__.py`` after the entities are set up.
         """
         # Every entity we read from; a change in any of them triggers a refresh.
-        watched = [self.switch_entity, *self.temp_sensors]
-        watched += [
-            e
-            for e in (self.power_sensor, self.humidity_sensor, self.co2_sensor)
-            if e
-        ]
+        watched = [self.switch_entity, *self.temp_sensors, *self.humidity_sensors]
+        watched += [e for e in (self.power_sensor, self.co2_sensor) if e]
         self._unsubs.append(
             async_track_state_change_event(self.hass, watched, self._async_on_state_change)
         )
@@ -281,19 +279,20 @@ class HeaterController:
         last_seen: datetime = getattr(state, "last_reported", None) or state.last_updated
         return now - last_seen > self.stale_after
 
-    def read_temperature(self) -> TemperatureReading:
-        """Combine all temperature sensors into one value.
+    def read_average(self, entity_ids: list[str]) -> SensorReading:
+        """Combine several sensors into one value.
 
+        Used for both temperature and humidity:
         * Sensors that are unavailable / not a number are skipped.
         * Sensors that haven't updated within the stale period are skipped.
         * The remaining (good) sensors are averaged.
         So if one sensor fails, the other one is simply used on its own.
         """
         now = dt_util.utcnow()
-        reading = TemperatureReading()
+        reading = SensorReading()
         values: list[float] = []
 
-        for entity_id in self.temp_sensors:
+        for entity_id in entity_ids:
             value = self._state_as_float(entity_id)
             if value is None:
                 reading.unavailable.append(entity_id)
@@ -311,8 +310,8 @@ class HeaterController:
 
     @property
     def humidity(self) -> float | None:
-        """Current humidity from the optional humidity sensor."""
-        return self._state_as_float(self.humidity_sensor)
+        """Average humidity of the usable humidity sensors (None if none)."""
+        return self.humidity_reading.value
 
     @property
     def co2(self) -> float | None:
@@ -468,7 +467,8 @@ class HeaterController:
         controller leaves the switch alone.
         """
         async with self._lock:
-            self.temperature = self.read_temperature()
+            self.temperature = self.read_average(self.temp_sensors)
+            self.humidity_reading = self.read_average(self.humidity_sensors)
 
             # Don't switch anything until HA has started and the previous
             # mode/target have been restored.

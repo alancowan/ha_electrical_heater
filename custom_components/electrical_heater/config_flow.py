@@ -32,7 +32,7 @@ from .const import (
     CONF_DEFAULT_TARGET,
     CONF_HEATER_SWITCH,
     CONF_HOT_TOLERANCE,
-    CONF_HUMIDITY_SENSOR,
+    CONF_HUMIDITY_SENSORS,
     CONF_MAX_BOOST_MINUTES,
     CONF_MAX_TEMP,
     CONF_MIN_CYCLE_MINUTES,
@@ -59,8 +59,10 @@ from .const import (
 )
 
 # Optional entities. When the user clears one of these in the options form the
-# key is missing from the input, so we store None explicitly to remove it.
-OPTIONAL_ENTITIES = (CONF_HUMIDITY_SENSOR, CONF_CO2_SENSOR)
+# key is missing from the input, so we store an explicit "empty" value to
+# remove it: an empty list for multi-select fields, None for single ones.
+OPTIONAL_MULTI_ENTITIES = (CONF_HUMIDITY_SENSORS,)
+OPTIONAL_SINGLE_ENTITIES = (CONF_CO2_SENSOR,)
 
 
 def _sensor_selector(device_class: SensorDeviceClass, multiple: bool = False) -> selector.EntitySelector:
@@ -108,7 +110,10 @@ def components_schema(include_name: bool) -> vol.Schema:
             # Power sensor that tells whether the heater is really heating.
             vol.Required(CONF_POWER_SENSOR): _sensor_selector(SensorDeviceClass.POWER),
             # Optional extras shown on the climate entity.
-            vol.Optional(CONF_HUMIDITY_SENSOR): _sensor_selector(SensorDeviceClass.HUMIDITY),
+            # Zero or more humidity sensors; averaged with the same stale check.
+            vol.Optional(CONF_HUMIDITY_SENSORS): _sensor_selector(
+                SensorDeviceClass.HUMIDITY, multiple=True
+            ),
             vol.Optional(CONF_CO2_SENSOR): _sensor_selector(SensorDeviceClass.CO2),
         }
     )
@@ -165,9 +170,11 @@ def validate_components(user_input: dict[str, Any]) -> dict[str, str]:
 
 
 def normalise_components(user_input: dict[str, Any]) -> dict[str, Any]:
-    """Store cleared optional sensors as None so they really get removed."""
+    """Store cleared optional sensors as [] / None so they really get removed."""
     data = dict(user_input)
-    for key in OPTIONAL_ENTITIES:
+    for key in OPTIONAL_MULTI_ENTITIES:
+        data[key] = list(data.get(key) or [])
+    for key in OPTIONAL_SINGLE_ENTITIES:
         data[key] = data.get(key) or None
     return data
 
@@ -175,7 +182,9 @@ def normalise_components(user_input: dict[str, Any]) -> dict[str, Any]:
 class ElectricalHeaterConfigFlow(ConfigFlow, domain=DOMAIN):
     """Flow shown when adding a new Electrical Heater."""
 
-    VERSION = 1
+    # Version 2: humidity changed from one sensor to a list of sensors.
+    # Older entries are upgraded by async_migrate_entry in __init__.py.
+    VERSION = 2
 
     def __init__(self) -> None:
         """Hold the answers of step 1 until step 2 is finished."""

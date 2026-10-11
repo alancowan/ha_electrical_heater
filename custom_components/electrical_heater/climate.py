@@ -22,11 +22,13 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from . import ElectricalHeaterConfigEntry
 from .const import (
+    ATTR_ACTIVE_HUMIDITY_SENSORS,
     ATTR_ACTIVE_SENSORS,
     ATTR_BOOST_ACTIVE,
     ATTR_BOOST_REMAINING,
     ATTR_CO2,
     ATTR_POWER,
+    ATTR_STALE_HUMIDITY_SENSORS,
     ATTR_STALE_SENSORS,
 )
 from .entity import ElectricalHeaterEntity
@@ -116,7 +118,7 @@ class ElectricalHeaterClimate(ElectricalHeaterEntity, ClimateEntity, RestoreEnti
 
     @property
     def current_humidity(self) -> float | None:
-        """Humidity from the optional humidity sensor (shown on the card)."""
+        """Average humidity of the optional humidity sensors (shown on the card)."""
         return self.controller.humidity
 
     @property
@@ -129,6 +131,9 @@ class ElectricalHeaterClimate(ElectricalHeaterEntity, ClimateEntity, RestoreEnti
             ATTR_ACTIVE_SENSORS: self.controller.temperature.active,
             ATTR_STALE_SENSORS: self.controller.temperature.stale,
         }
+        if self.controller.humidity_sensors:
+            attrs[ATTR_ACTIVE_HUMIDITY_SENSORS] = self.controller.humidity_reading.active
+            attrs[ATTR_STALE_HUMIDITY_SENSORS] = self.controller.humidity_reading.stale
         if self.controller.co2_sensor:
             attrs[ATTR_CO2] = self.controller.co2
         return attrs

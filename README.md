@@ -7,7 +7,7 @@ Turns a plain smart switch into a full thermostat, using sensors you already hav
 | Switch (`switch`, `input_boolean` or `light`) | yes | Turns the heater on and off |
 | Temperature sensor(s) | yes, 1 or more | Averaged. Unavailable or stale sensors are skipped, so if one fails the others are used |
 | Power sensor | yes | Shows whether the heater is really heating (power above threshold) |
-| Humidity sensor | optional | Shown on the thermostat card |
+| Humidity sensor(s) | optional, 0 or more | Averaged and shown on the thermostat card. Same stale check as temperature |
 | CO2 sensor | optional | Shown as the `co2` attribute |
 
 ## What you get
@@ -19,6 +19,7 @@ One device with these entities:
 - **`number.<name>_boost`**: slider from 0 to 60 min. Runs the heater for that long whatever the
   mode or temperature, then counts down. Set it to 0 to cancel.
 - **`sensor.<name>_temperature`**: the averaged temperature the thermostat uses.
+- **`sensor.<name>_humidity`**: the averaged humidity (only when humidity sensors are configured).
 - **`binary_sensor.<name>_heating`**: on while power is above the threshold.
 - **`binary_sensor.<name>_temperature_sensor_problem`**: on when any temperature sensor is stale or unavailable.
   Use it for alert automations.
@@ -35,7 +36,7 @@ All of these can be changed later under **Settings → Devices & services → El
 | Cold tolerance | 0.3 | Heater turns **on** at `target − cold tolerance` |
 | Hot tolerance | 0.3 | Heater turns **off** at `target + hot tolerance` |
 | Power threshold | 10 W | Above this the heater counts as heating |
-| Sensor stale after | 3 h (max 24) | A temperature sensor that hasn't reported for this long is ignored |
+| Sensor stale after | 3 h (max 24) | A temperature or humidity sensor that hasn't reported for this long is ignored |
 | Minimum cycle time | 0 min | Minimum time the switch stays on or off before the thermostat toggles it again (protects relays) |
 | Maximum boost time | 60 min | Upper limit of the boost slider |
 

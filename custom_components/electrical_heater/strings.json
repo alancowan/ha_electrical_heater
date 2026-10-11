@@ -9,13 +9,14 @@
           "heater_switch": "Heater switch",
           "temperature_sensors": "Temperature sensor(s)",
           "power_sensor": "Power sensor",
-          "humidity_sensor": "Humidity sensor (optional)",
+          "humidity_sensors": "Humidity sensor(s) (optional)",
           "co2_sensor": "CO2 sensor (optional)"
         },
         "data_description": {
           "heater_switch": "The switch that turns the heater on and off.",
           "temperature_sensors": "One or more sensors. Usable ones are averaged; a failed or stale one is ignored.",
-          "power_sensor": "Tells whether the heater is actually heating."
+          "power_sensor": "Tells whether the heater is actually heating.",
+          "humidity_sensors": "Zero or more sensors. Averaged like temperature, using the same stale time."
         }
       },
       "settings": {
@@ -36,7 +37,7 @@
           "cold_tolerance": "Heater turns on when the temperature drops to target minus this value.",
           "hot_tolerance": "Heater turns off when the temperature reaches target plus this value.",
           "power_threshold": "Above this power the heater counts as heating.",
-          "stale_hours": "A temperature sensor that has not reported for this long is ignored (max 24 h).",
+          "stale_hours": "A temperature or humidity sensor that has not reported for this long is ignored (max 24 h).",
           "min_cycle_minutes": "Minimum time the switch stays on or off before the thermostat changes it again. 0 disables. Mode changes and boost ignore this.",
           "max_boost_minutes": "Upper limit of the boost slider (max 60 min)."
         }
@@ -59,8 +60,11 @@
           "heater_switch": "Heater switch",
           "temperature_sensors": "Temperature sensor(s)",
           "power_sensor": "Power sensor",
-          "humidity_sensor": "Humidity sensor (optional)",
+          "humidity_sensors": "Humidity sensor(s) (optional)",
           "co2_sensor": "CO2 sensor (optional)"
+        },
+        "data_description": {
+          "humidity_sensors": "Zero or more sensors. Averaged like temperature, using the same stale time."
         }
       },
       "settings": {
@@ -81,7 +85,7 @@
           "cold_tolerance": "Heater turns on when the temperature drops to target minus this value.",
           "hot_tolerance": "Heater turns off when the temperature reaches target plus this value.",
           "power_threshold": "Above this power the heater counts as heating.",
-          "stale_hours": "A temperature sensor that has not reported for this long is ignored (max 24 h).",
+          "stale_hours": "A temperature or humidity sensor that has not reported for this long is ignored (max 24 h).",
           "min_cycle_minutes": "Minimum time the switch stays on or off before the thermostat changes it again. 0 disables. Mode changes and boost ignore this.",
           "max_boost_minutes": "Upper limit of the boost slider (max 60 min)."
         }
@@ -94,11 +98,26 @@
     }
   },
   "entity": {
-    "number": { "boost": { "name": "Boost" } },
-    "sensor": { "temperature": { "name": "Temperature" } },
+    "number": {
+      "boost": {
+        "name": "Boost"
+      }
+    },
+    "sensor": {
+      "temperature": {
+        "name": "Temperature"
+      },
+      "humidity": {
+        "name": "Humidity"
+      }
+    },
     "binary_sensor": {
-      "heating": { "name": "Heating" },
-      "sensor_problem": { "name": "Temperature sensor problem" }
+      "heating": {
+        "name": "Heating"
+      },
+      "sensor_problem": {
+        "name": "Temperature sensor problem"
+      }
     }
   }
 }
