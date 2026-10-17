@@ -40,6 +40,7 @@ All of these can be changed later under **Settings → Devices & services → El
 | Sensor stale after | 3 h (max 24) | A temperature or humidity sensor that hasn't reported for this long is ignored |
 | Minimum cycle time | 0 min | Minimum time the switch stays on or off before the thermostat toggles it again (protects relays) |
 | Maximum boost time | 60 min (max 24 h) | Upper limit of the boost slider. Above 2 h the slider moves in 5-minute steps |
+| Boost when switched on by hand | 0 (off) | Turning the switch on at the device starts a boost of this many minutes. Turning it off at the device cancels the boost and sets the mode to Off. Can't exceed the maximum boost time |
 
 ## Behaviour notes
 
@@ -49,6 +50,10 @@ All of these can be changed later under **Settings → Devices & services → El
 - **Off mode:** the switch is turned off when you choose Off. After that the integration leaves
   the switch alone, so you can still use it by hand.
 - **Boost** overrides everything, and it is **not** resumed after a Home Assistant restart.
+- **Switching by hand:** with *Boost when switched on by hand* set to 0, the thermostat corrects a
+  heater switched on at the device (e.g. turns it off again in Heat mode when it's warm enough).
+  Set it to e.g. 60 to get a one-hour boost instead. A switch change counts as "by hand" when it
+  differs from what the integration last asked for, so it works with any switch or plug.
 - **Stale detection** uses the time the sensor last *reported*, not the last time its value changed.
   Sensors that only report when the value changes might be marked stale in a very stable room,
   so pick a stale time that suits your sensors.
@@ -70,6 +75,8 @@ resources are managed in YAML, add `/electrical_heater/electrical-heater-card.js
 `module` resource yourself.
 
 Edit a dashboard → **Add card** → search **Electrical Heater Card**, then pick your heater.
+The card also works with **any other climate entity** (e.g. a Toon or Nest thermostat); parts the
+entity doesn't support, such as power or boost, are simply hidden.
 
 - **Title:** tap it to open the heater's details.
 - **Heater icon:** tap it to switch Heat / Off. It's orange with a glow while heating, faded
@@ -77,25 +84,35 @@ Edit a dashboard → **Add card** → search **Electrical Heater Card**, then pi
 - **Readings:** temperature, humidity, power and CO2 (each can be hidden).
 - **− / +:** change the target. Quick presses are sent as one change.
 - **Boost slider:** runs the heater for the chosen time. The label shows the time left (e.g. `15 min`, `2h 30m`).
+- **Extra entities:** optional rows underneath, like the Entities card. Switches and input
+  booleans get a toggle, buttons and scripts a button, everything else shows its state. Tap a
+  name for its details.
 
 Colours, borders and corners come from your Home Assistant theme.
 
 | Option | Default | Meaning |
 |---|---|---|
-| `entity` | (required) | The heater's climate entity |
-| `name` | heater name | Card title |
+| `entity` | (required) | A climate entity (Electrical Heater or any other) |
+| `name` | entity name | Card title |
 | `icon` | built-in radiator | Icon while on, e.g. `mdi:fire` |
 | `icon_off` | crossed-out radiator, or `icon` in grey | Icon while off |
 | `show_humidity` | `true` | Show the humidity row |
 | `show_power` | `true` | Show the power row |
 | `show_co2` | `true` | Show the CO2 row |
+| `show_action` | when there's no power reading | Show what the climate is doing (idle, heating) |
 | `show_boost` | `true` | Show the boost slider |
 | `boost_entity` | found automatically | Boost number entity, only needed in unusual setups |
+| `entities` | none | Extra rows: entity ids, or `{entity, name, icon}` |
 
 ```yaml
 type: custom:electrical-heater-card
 entity: climate.emmalee_bedroom
 icon: mdi:heat-wave
+entities:
+  - input_boolean.program
+  - entity: input_boolean.holiday
+    name: Holiday
+  - sensor.lounge_temperature
 ```
 
 After an update, refresh the browser (or the app) once so it loads the new card version.

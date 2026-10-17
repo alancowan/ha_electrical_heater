@@ -40,6 +40,8 @@ CONF_HOT_TOLERANCE = "hot_tolerance"  # Hysteresis above target before turning o
 CONF_STALE_HOURS = "stale_hours"  # Hours without updates before a sensor is stale
 CONF_MIN_CYCLE_MINUTES = "min_cycle_minutes"  # Minimum time between switch toggles
 CONF_MAX_BOOST_MINUTES = "max_boost_minutes"  # Upper limit of the boost slider
+# Minutes of boost started when the switch is turned on by hand (0 = off)
+CONF_MANUAL_BOOST_MINUTES = "manual_boost_minutes"
 
 # --- Defaults ---------------------------------------------------------------
 DEFAULT_NAME = "Electrical Heater"
@@ -53,6 +55,7 @@ DEFAULT_HOT_TOLERANCE = 0.3
 DEFAULT_STALE_HOURS = 3
 DEFAULT_MIN_CYCLE_MINUTES = 0
 DEFAULT_MAX_BOOST_MINUTES = 60
+DEFAULT_MANUAL_BOOST_MINUTES = 0
 
 # Hard limits enforced by the config flow
 MAX_STALE_HOURS = 24

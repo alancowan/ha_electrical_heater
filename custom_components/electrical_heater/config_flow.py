@@ -33,6 +33,7 @@ from .const import (
     CONF_HEATER_SWITCH,
     CONF_HOT_TOLERANCE,
     CONF_HUMIDITY_SENSORS,
+    CONF_MANUAL_BOOST_MINUTES,
     CONF_MAX_BOOST_MINUTES,
     CONF_MAX_TEMP,
     CONF_MIN_CYCLE_MINUTES,
@@ -44,6 +45,7 @@ from .const import (
     CONF_TEMP_STEP,
     DEFAULT_COLD_TOLERANCE,
     DEFAULT_HOT_TOLERANCE,
+    DEFAULT_MANUAL_BOOST_MINUTES,
     DEFAULT_MAX_BOOST_MINUTES,
     DEFAULT_MAX_TEMP,
     DEFAULT_MIN_CYCLE_MINUTES,
@@ -144,6 +146,7 @@ def settings_schema(current: dict[str, Any]) -> vol.Schema:
             vol.Required(CONF_STALE_HOURS, default=default(CONF_STALE_HOURS, DEFAULT_STALE_HOURS)): _number(0.5, MAX_STALE_HOURS, 0.5, "h"),
             vol.Required(CONF_MIN_CYCLE_MINUTES, default=default(CONF_MIN_CYCLE_MINUTES, DEFAULT_MIN_CYCLE_MINUTES)): _number(0, 60, 1, "min"),
             vol.Required(CONF_MAX_BOOST_MINUTES, default=default(CONF_MAX_BOOST_MINUTES, DEFAULT_MAX_BOOST_MINUTES)): _number(5, MAX_BOOST_MINUTES, 5, "min"),
+            vol.Required(CONF_MANUAL_BOOST_MINUTES, default=default(CONF_MANUAL_BOOST_MINUTES, DEFAULT_MANUAL_BOOST_MINUTES)): _number(0, MAX_BOOST_MINUTES, 5, "min"),
         }
     )
 
@@ -159,6 +162,8 @@ def validate_settings(user_input: dict[str, Any]) -> dict[str, str]:
         <= user_input[CONF_MAX_TEMP]
     ):
         errors[CONF_DEFAULT_TARGET] = "target_out_of_range"
+    if user_input.get(CONF_MANUAL_BOOST_MINUTES, 0) > user_input[CONF_MAX_BOOST_MINUTES]:
+        errors[CONF_MANUAL_BOOST_MINUTES] = "manual_boost_above_max"
     return errors
 
 

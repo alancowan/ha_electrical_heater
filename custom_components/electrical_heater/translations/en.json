@@ -31,7 +31,8 @@
           "power_threshold": "Power threshold",
           "stale_hours": "Sensor stale after",
           "min_cycle_minutes": "Minimum on/off cycle time",
-          "max_boost_minutes": "Maximum boost time"
+          "max_boost_minutes": "Maximum boost time",
+          "manual_boost_minutes": "Boost when switched on by hand"
         },
         "data_description": {
           "cold_tolerance": "Heater turns on when the temperature drops to target minus this value.",
@@ -39,13 +40,15 @@
           "power_threshold": "Above this power the heater counts as heating.",
           "stale_hours": "A temperature or humidity sensor that has not reported for this long is ignored (max 24 h).",
           "min_cycle_minutes": "Minimum time the switch stays on or off before the thermostat changes it again. 0 disables. Mode changes and boost ignore this.",
-          "max_boost_minutes": "Upper limit of the boost slider (max 1440 min = 24 h)."
+          "max_boost_minutes": "Upper limit of the boost slider (max 1440 min = 24 h).",
+          "manual_boost_minutes": "When the switch is turned on at the device (not by this integration), start a boost of this many minutes. Turning it off at the device cancels the boost and sets the mode to off. 0 = off."
         }
       }
     },
     "error": {
       "max_below_min": "Maximum temperature must be higher than minimum temperature.",
-      "target_out_of_range": "Default target must be between minimum and maximum temperature."
+      "target_out_of_range": "Default target must be between minimum and maximum temperature.",
+      "manual_boost_above_max": "Can't be longer than the maximum boost time."
     },
     "abort": {
       "already_configured": "This switch is already used by another heater."
@@ -79,7 +82,8 @@
           "power_threshold": "Power threshold",
           "stale_hours": "Sensor stale after",
           "min_cycle_minutes": "Minimum on/off cycle time",
-          "max_boost_minutes": "Maximum boost time"
+          "max_boost_minutes": "Maximum boost time",
+          "manual_boost_minutes": "Boost when switched on by hand"
         },
         "data_description": {
           "cold_tolerance": "Heater turns on when the temperature drops to target minus this value.",
@@ -87,13 +91,15 @@
           "power_threshold": "Above this power the heater counts as heating.",
           "stale_hours": "A temperature or humidity sensor that has not reported for this long is ignored (max 24 h).",
           "min_cycle_minutes": "Minimum time the switch stays on or off before the thermostat changes it again. 0 disables. Mode changes and boost ignore this.",
-          "max_boost_minutes": "Upper limit of the boost slider (max 1440 min = 24 h)."
+          "max_boost_minutes": "Upper limit of the boost slider (max 1440 min = 24 h).",
+          "manual_boost_minutes": "When the switch is turned on at the device (not by this integration), start a boost of this many minutes. Turning it off at the device cancels the boost and sets the mode to off. 0 = off."
         }
       }
     },
     "error": {
       "max_below_min": "Maximum temperature must be higher than minimum temperature.",
-      "target_out_of_range": "Default target must be between minimum and maximum temperature."
+      "target_out_of_range": "Default target must be between minimum and maximum temperature.",
+      "manual_boost_above_max": "Can't be longer than the maximum boost time."
     }
   },
   "entity": {

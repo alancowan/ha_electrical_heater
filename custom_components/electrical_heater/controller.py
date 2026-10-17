@@ -30,6 +30,7 @@ from homeassistant.const import (
     ATTR_ENTITY_ID,
     SERVICE_TURN_OFF,
     SERVICE_TURN_ON,
+    STATE_OFF,
     STATE_ON,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
@@ -57,6 +58,7 @@ from .const import (
     CONF_HEATER_SWITCH,
     CONF_HOT_TOLERANCE,
     CONF_HUMIDITY_SENSORS,
+    CONF_MANUAL_BOOST_MINUTES,
     CONF_MAX_BOOST_MINUTES,
     CONF_MAX_TEMP,
     CONF_MIN_CYCLE_MINUTES,
@@ -68,6 +70,7 @@ from .const import (
     CONF_TEMP_STEP,
     DEFAULT_COLD_TOLERANCE,
     DEFAULT_HOT_TOLERANCE,
+    DEFAULT_MANUAL_BOOST_MINUTES,
     DEFAULT_MAX_BOOST_MINUTES,
     DEFAULT_MAX_TEMP,
     DEFAULT_MIN_CYCLE_MINUTES,
@@ -140,6 +143,10 @@ class HeaterController:
         self.max_boost_minutes = int(
             conf.get(CONF_MAX_BOOST_MINUTES, DEFAULT_MAX_BOOST_MINUTES)
         )
+        # Boost started when someone turns the switch on at the device (0 = off).
+        self.manual_boost_minutes = int(
+            conf.get(CONF_MANUAL_BOOST_MINUTES, DEFAULT_MANUAL_BOOST_MINUTES)
+        )
 
         # Runtime state. hvac_mode / target are overwritten by the climate
         # entity when it restores the values from before a restart.
@@ -161,6 +168,9 @@ class HeaterController:
         # Set when the switch must be forced into the right state as soon as
         # switching is allowed (see async_restore).
         self._force_pending = False
+        # The state we last switched the heater to (None = not yet). A switch
+        # change that doesn't match it was made by hand (see manual boost).
+        self._commanded_on: bool | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -259,7 +269,42 @@ class HeaterController:
 
     async def _async_on_state_change(self, event: Event[EventStateChangedData]) -> None:
         """A watched entity changed: re-run the logic and refresh the entities."""
+        if event.data["entity_id"] == self.switch_entity and await self._async_handle_manual_switch(
+            event.data["old_state"], event.data["new_state"]
+        ):
+            return
         await self.async_control()
+
+    async def _async_handle_manual_switch(self, old: State | None, new: State | None) -> bool:
+        """React to the switch being flipped by hand, if manual boost is enabled.
+
+        * Turned on by hand  -> start a boost of ``manual_boost_minutes``.
+        * Turned off by hand -> cancel the boost and set the mode to OFF, so
+          the heater really stays off.
+
+        "By hand" means: a change between on and off that this controller
+        didn't ask for (it differs from the last command we sent). This works
+        for any switch, unlike Home Assistant contexts, which many devices
+        don't pass back. Returns True if the change was handled here.
+        """
+        if self.manual_boost_minutes <= 0 or not (self._started and self._restored):
+            return False
+        if old is None or new is None or {old.state, new.state} != {STATE_ON, STATE_OFF}:
+            return False  # not an on <-> off change (e.g. coming back online)
+        turned_on = new.state == STATE_ON
+        if turned_on == self._commanded_on:
+            return False  # the result of our own command
+
+        # Remember the new state as wanted, so the controller won't undo it.
+        self._commanded_on = turned_on
+        if turned_on:
+            _LOGGER.debug("%s turned on by hand: boost %s min", self.switch_entity, self.manual_boost_minutes)
+            await self.async_set_boost(self.manual_boost_minutes)
+        else:
+            _LOGGER.debug("%s turned off by hand: boost cancelled, mode off", self.switch_entity)
+            self.hvac_mode = HVACMode.OFF
+            await self.async_set_boost(0)
+        return True
 
     async def _async_on_tick(self, _now: datetime) -> None:
         """Periodic check for stale sensors, boost expiry and thermostat logic."""
@@ -532,6 +577,7 @@ class HeaterController:
             self.target_temperature,
             self.boost_active,
         )
+        self._commanded_on = desired
         # homeassistant.turn_on/off works for switch, input_boolean, light, ...
         await self.hass.services.async_call(
             "homeassistant",

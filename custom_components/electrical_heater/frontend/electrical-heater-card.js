@@ -16,24 +16,36 @@
  *   │ │ 🔥 Boost ─────●───────── │ │  boost slider (optional); the label
  *   │ │                          │ │  shows the minutes left while boosting
  *   │ └──────────────────────────┘ │
+ *   │ ┌──────────────────────────┐ │
+ *   │ │ 📅 Program          [●═] │ │  extra entities (optional), like the
+ *   │ │ 🌡 Lounge temp    20.4°C │ │  standard Entities card
+ *   │ └──────────────────────────┘ │
  *   └──────────────────────────────┘
+ *
+ * Works with any climate entity, not only Electrical Heater ones. Rows and
+ * bars that need data the entity doesn't have (power, boost, ...) are hidden.
  *
  * Written as a plain Web Component (no build step, no libraries) so the
  * file can be served by the integration as-is.
  *
  * Card options (YAML):
- *   entity:        climate entity of the heater (required)
- *   name:          title; defaults to the heater's name
+ *   entity:        climate entity (required)
+ *   name:          title; defaults to the entity's name
  *   icon:          icon while on, e.g. mdi:fire (default: built-in radiator)
  *   icon_off:      icon while off (default: crossed-out radiator, or `icon` in grey)
  *   show_humidity: show the humidity row        (default true)
  *   show_power:    show the power row           (default true)
  *   show_co2:      show the CO2 row             (default true)
+ *   show_action:   show what it's doing ("Idle", "Heating")
+ *                  (default: only when there is no power reading)
  *   show_boost:    show the boost slider        (default true)
  *   boost_entity:  number entity for boost; found automatically if omitted
+ *   entities:      extra rows; each an entity id or
+ *                  { entity, name, icon }. Switches get a toggle, buttons and
+ *                  scripts a button, everything else shows its state.
  */
 
-const CARD_VERSION = "0.4.2";
+const CARD_VERSION = "0.5.0";
 const INTEGRATION = "electrical_heater";
 
 // Material Design Icons (same icons Home Assistant uses), embedded so the
@@ -49,6 +61,7 @@ const ICONS = {
     "M12,3.25C12,3.25 6,10 6,14C6,17.32 8.69,20 12,20A6,6 0 0,0 18,14C18,10 12,3.25 12,3.25M14.47,9.97L15.53,11.03L9.53,17.03L8.47,15.97M9.75,10A1.25,1.25 0 0,1 11,11.25A1.25,1.25 0 0,1 9.75,12.5A1.25,1.25 0 0,1 8.5,11.25A1.25,1.25 0 0,1 9.75,10M14.25,14.5A1.25,1.25 0 0,1 15.5,15.75A1.25,1.25 0 0,1 14.25,17A1.25,1.25 0 0,1 13,15.75A1.25,1.25 0 0,1 14.25,14.5Z",
   power: "M7,2V13H10V22L17,10H13L17,2H7Z",
   co2: "M5,7A2,2 0 0,0 3,9V15A2,2 0 0,0 5,17H8V15H5V9H8V7H5M11,7A2,2 0 0,0 9,9V15A2,2 0 0,0 11,17H13A2,2 0 0,0 15,15V9A2,2 0 0,0 13,7H11M11,9H13V15H11V9M16,10.5V12H19V13.5H17.5A1.5,1.5 0 0,0 16,15V18H20.5V16.5H17.5V15H19A1.5,1.5 0 0,0 20.5,13.5V12A1.5,1.5 0 0,0 19,10.5H16Z",
+  cog: "M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z",
   minus: "M19,13H5V11H19V13Z",
   plus: "M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z",
   fire: "M17.66 11.2C17.43 10.9 17.15 10.64 16.89 10.38C16.22 9.78 15.46 9.35 14.82 8.72C13.33 7.26 13 4.85 13.95 3C13 3.23 12.17 3.75 11.46 4.32C8.87 6.4 7.85 10.07 9.07 13.22C9.11 13.32 9.15 13.42 9.15 13.55C9.15 13.77 9 13.97 8.8 14.05C8.57 14.15 8.33 14.09 8.14 13.93C8.08 13.88 8.04 13.83 8 13.76C6.87 12.33 6.69 10.28 7.45 8.64C5.78 10 4.87 12.3 5 14.47C5.06 14.97 5.12 15.47 5.29 15.97C5.43 16.57 5.7 17.17 6 17.7C7.08 19.43 8.95 20.67 10.96 20.92C13.1 21.19 15.39 20.8 17.03 19.32C18.86 17.66 19.5 15 18.56 12.72L18.43 12.46C18.22 12 17.66 11.2 17.66 11.2M14.5 17.5C14.22 17.74 13.76 18 13.4 18.1C12.28 18.5 11.16 17.94 10.5 17.28C11.69 17 12.4 16.12 12.61 15.23C12.78 14.43 12.46 13.77 12.33 13C12.21 12.26 12.23 11.63 12.5 10.94C12.69 11.32 12.89 11.7 13.13 12C13.9 13 15.11 13.44 15.37 14.8C15.41 14.94 15.43 15.08 15.43 15.23C15.46 16.05 15.1 16.95 14.5 17.5H14.5Z",
@@ -57,6 +70,28 @@ const ICONS = {
 /** Build an inline <svg> for one of the icons above. */
 const svg = (path, cls = "") =>
   `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"></path></svg>`;
+
+// Extra entity rows: domains that get an on/off toggle, and domains that get
+// a button (with the service it calls and the button text).
+const TOGGLE_DOMAINS = ["switch", "input_boolean", "light", "fan", "automation", "siren", "humidifier"];
+const BUTTON_DOMAINS = {
+  button: ["press", "Press"],
+  input_button: ["press", "Press"],
+  script: ["turn_on", "Run"],
+  scene: ["turn_on", "Run"],
+};
+
+// Colour of the heater icon per HVAC mode (theme variables, HA fallbacks).
+const MODE_COLORS = {
+  heat: "var(--state-climate-heat-color, #ff8100)",
+  cool: "var(--state-climate-cool-color, #2b9af9)",
+  heat_cool: "var(--state-climate-heat-cool-color, #8f50ff)",
+  auto: "var(--state-climate-auto-color, #008000)",
+  dry: "var(--state-climate-dry-color, #efbd07)",
+  fan_only: "var(--state-climate-fan_only-color, #00bcd4)",
+};
+// While actively heating/cooling, the action decides the colour.
+const ACTION_COLORS = { heating: MODE_COLORS.heat, cooling: MODE_COLORS.cool, drying: MODE_COLORS.dry, fan: MODE_COLORS.fan_only };
 
 // Wait this long after the last + / − press before sending the new target,
 // so several quick presses become one change instead of many.
@@ -148,9 +183,10 @@ const STYLE = `
     --mdc-icon-size: 68px;
     transition: opacity 0.3s, filter 0.3s;
   }
-  .heater.heating { color: var(--state-climate-heat-color, #ff8100); }
-  .heater.heating .heater-icon { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--state-climate-heat-color, #ff8100) 45%, transparent)); }
-  .heater.idle { color: var(--state-climate-heat-color, #ff8100); }
+  /* --heater-color is set per mode/action (heat = orange, cool = blue, ...). */
+  .heater.active { color: var(--heater-color); }
+  .heater.active .heater-icon { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--heater-color) 45%, transparent)); }
+  .heater.idle { color: var(--heater-color); }
   .heater.idle .heater-icon { opacity: 0.45; }
   .heater.off { color: var(--disabled-text-color, #9e9e9e); }
 
@@ -173,6 +209,7 @@ const STYLE = `
   .readings li[hidden] { display: none; }
   .readings svg { width: 18px; height: 18px; flex: none; color: var(--secondary-text-color, #727272); }
   .readings .stale { color: var(--secondary-text-color, #727272); }
+  .readings .r-action span { text-transform: lowercase; }
 
   /* ---- Bottom bars (target, boost) ----------------------------------- */
   .bar {
@@ -231,13 +268,101 @@ const STYLE = `
     cursor: pointer;
   }
 
+  /* ---- Extra entities (like the Entities card) ---------------------- */
+  .entities {
+    margin-top: 8px;
+    padding: 4px 12px;
+    border-radius: var(--ha-border-radius-md, 12px);
+    background: var(--secondary-background-color, rgba(127, 127, 127, 0.08));
+    border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.15));
+  }
+  .entities[hidden] { display: none; }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 48px;
+  }
+  .row-icon {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    color: var(--state-icon-color, var(--secondary-text-color, #727272));
+    --mdc-icon-size: 24px;
+  }
+  .row-icon svg { width: 24px; height: 24px; }
+  .row-name {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .row-value {
+    flex: none;
+    max-width: 50%;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
+  .row.unavailable .row-name, .row.unavailable .row-value { color: var(--disabled-text-color, #9e9e9e); }
+  /* Text button for buttons, scripts and scenes ("Press" / "Run"). */
+  .row-action {
+    flex: none;
+    padding: 6px 10px;
+    border-radius: 8px;
+    color: var(--primary-color, #03a9f4);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+  }
+  .row-action:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+  /* On/off toggle, coloured with the theme's switch variables. */
+  .toggle {
+    flex: none;
+    position: relative;
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--switch-unchecked-track-color, #9e9e9e) 45%, transparent);
+    border: 1px solid var(--switch-unchecked-track-color, var(--divider-color, #9e9e9e));
+    box-sizing: border-box;
+    transition: background-color 0.2s, border-color 0.2s;
+  }
+  .toggle::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--switch-unchecked-button-color, #bdbdbd);
+    transition: transform 0.2s, background-color 0.2s;
+  }
+  .toggle[aria-checked="true"] {
+    background: color-mix(in srgb, var(--switch-checked-track-color, var(--switch-checked-color, var(--primary-color, #03a9f4))) 55%, transparent);
+    border-color: transparent;
+  }
+  .toggle[aria-checked="true"]::after {
+    transform: translateX(18px);
+    background: var(--switch-checked-button-color, var(--switch-checked-color, var(--primary-color, #03a9f4)));
+  }
+  .toggle:disabled { opacity: 0.4; cursor: default; }
+
   .warning {
     padding: 16px;
     color: var(--error-color, #db4437);
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .heater, .heater-icon, .target-value { transition: none; }
+    .heater, .heater-icon, .target-value, .toggle, .toggle::after { transition: none; }
   }
 `;
 
@@ -265,12 +390,20 @@ class ElectricalHeaterCard extends HTMLElement {
     if (!config.entity.startsWith("climate.")) {
       throw new Error("The entity must be a climate entity, e.g. climate.bedroom_heater.");
     }
+    const entities = config.entities || [];
+    if (!Array.isArray(entities)) {
+      throw new Error("`entities` must be a list.");
+    }
     this._config = {
       show_humidity: true,
       show_power: true,
       show_co2: true,
       show_boost: true,
       ...config,
+      // Accept both "sensor.x" and { entity: "sensor.x", name, icon }.
+      entities: entities
+        .map((e) => (typeof e === "string" ? { entity: e } : e))
+        .filter((e) => e && e.entity),
     };
     this._built = false;
     this._iconKey = null;
@@ -285,7 +418,8 @@ class ElectricalHeaterCard extends HTMLElement {
 
   /** Rough height in rows of 50px, used by the masonry dashboard layout. */
   getCardSize() {
-    return this._config && this._config.show_boost ? 4 : 3;
+    if (!this._config) return 3;
+    return 3 + (this._config.show_boost ? 1 : 0) + Math.ceil(this._config.entities.length * 0.9);
   }
 
   /** Default size in the sections (grid) dashboard layout. */
@@ -303,14 +437,16 @@ class ElectricalHeaterCard extends HTMLElement {
       show_humidity: "Show humidity",
       show_power: "Show power",
       show_co2: "Show CO2",
+      show_action: "Show action (idle / heating)",
       show_boost: "Show boost slider",
+      entities: "Extra entities (optional)",
     };
     return {
       schema: [
         {
           name: "entity",
           required: true,
-          selector: { entity: { filter: { domain: "climate", integration: INTEGRATION } } },
+          selector: { entity: { filter: { domain: "climate" } } },
         },
         { name: "name", selector: { text: {} } },
         {
@@ -328,9 +464,12 @@ class ElectricalHeaterCard extends HTMLElement {
             { name: "show_humidity", selector: { boolean: {} } },
             { name: "show_power", selector: { boolean: {} } },
             { name: "show_co2", selector: { boolean: {} } },
+            { name: "show_action", selector: { boolean: {} } },
             { name: "show_boost", selector: { boolean: {} } },
           ],
         },
+        // A list of entity ids. Custom names/icons per row: use YAML.
+        { name: "entities", selector: { entity: { multiple: true } } },
       ],
       computeLabel: (schema) => labels[schema.name] || schema.name,
     };
@@ -339,9 +478,9 @@ class ElectricalHeaterCard extends HTMLElement {
   /** Initial config when the card is added from the card picker. */
   static getStubConfig(hass) {
     const entities = Object.values((hass && hass.entities) || {});
-    const heater = entities.find(
-      (e) => e.platform === INTEGRATION && e.entity_id.startsWith("climate.")
-    );
+    // Prefer an Electrical Heater; otherwise any climate entity.
+    const climates = entities.filter((e) => e.entity_id.startsWith("climate."));
+    const heater = climates.find((e) => e.platform === INTEGRATION) || climates[0];
     return { entity: heater ? heater.entity_id : "" };
   }
 
@@ -370,6 +509,7 @@ class ElectricalHeaterCard extends HTMLElement {
               <li class="r-humidity">${svg(ICONS.humidity)}<span></span></li>
               <li class="r-power">${svg(ICONS.power)}<span></span></li>
               <li class="r-co2">${svg(ICONS.co2)}<span></span></li>
+              <li class="r-action">${svg(ICONS.cog)}<span></span></li>
             </ul>
           </div>
           <div class="bar target">
@@ -382,6 +522,7 @@ class ElectricalHeaterCard extends HTMLElement {
             <label class="boost-label" for="boost">Boost</label>
             <input id="boost" type="range" min="0" max="60" step="1" value="0" />
           </div>
+          <div class="entities"></div>
         </div>
       </ha-card>
       <div class="warning" hidden></div>
@@ -397,6 +538,8 @@ class ElectricalHeaterCard extends HTMLElement {
       humidity: $(".r-humidity"),
       power: $(".r-power"),
       co2: $(".r-co2"),
+      action: $(".r-action"),
+      entities: $(".entities"),
       minus: $(".minus"),
       plus: $(".plus"),
       target: $(".target-value"),
@@ -423,6 +566,7 @@ class ElectricalHeaterCard extends HTMLElement {
       this._setBoost(Number(slider.value));
     });
 
+    this._buildEntityRows();
     this._built = true;
   }
 
@@ -443,27 +587,28 @@ class ElectricalHeaterCard extends HTMLElement {
 
     const a = stateObj.attributes;
     const unit = this._tempUnit();
-    const mode = stateObj.state; // "heat" | "off" | "unavailable"
-    const action = a.hvac_action; // "heating" | "idle" | "off"
+    const mode = stateObj.state; // "heat" | "off" | "cool" | ... | "unavailable"
+    const action = a.hvac_action; // "heating" | "idle" | "off" | ... (optional)
 
     // Title
     el.title.textContent = this._config.name || a.friendly_name || this._config.entity;
 
     // Heater icon: colour + shape reflect what the heater is doing.
-    const look = action === "heating" ? "heating" : mode === "heat" || action === "idle" ? "idle" : "off";
+    //   active: heating/cooling now; idle: on but waiting; off.
+    const isOn = mode !== "off" && mode !== "unavailable" && mode !== "unknown";
+    const look = ACTION_COLORS[action] ? "active" : isOn || action === "idle" ? "idle" : "off";
     el.heater.className = `heater ${look}`;
+    el.heater.style.setProperty("--heater-color", ACTION_COLORS[action] || MODE_COLORS[mode] || MODE_COLORS.heat);
     this._setHeaterIcon(look === "off");
 
-    // Without temperature sensors the heater has no Heat mode (boost only),
-    // so tapping the icon can't switch it on.
-    const canHeat = (a.hvac_modes || []).includes("heat");
-    el.heater.disabled = !canHeat;
-    if (canHeat) {
-      el.heater.setAttribute(
-        "aria-label",
-        mode === "heat" ? "Heater is on. Turn off" : "Heater is off. Turn on"
-      );
-      el.heater.title = mode === "heat" ? "Tap to turn off" : "Tap to turn on";
+    // Tapping the icon switches between Off and the "on" mode (Heat if the
+    // entity has it). An Electrical Heater without temperature sensors has
+    // no Heat mode (boost only), so then the icon isn't a button.
+    const onMode = this._onMode(a.hvac_modes);
+    el.heater.disabled = !onMode;
+    if (onMode) {
+      el.heater.setAttribute("aria-label", isOn ? "Heater is on. Turn off" : "Heater is off. Turn on");
+      el.heater.title = isOn ? "Tap to turn off" : "Tap to turn on";
     } else {
       el.heater.setAttribute("aria-label", look === "off" ? "Heater is off" : "Heater is boosting");
       el.heater.title = "Use Boost to run the heater";
@@ -475,6 +620,15 @@ class ElectricalHeaterCard extends HTMLElement {
     this._setReading(el.humidity, this._config.show_humidity, a.current_humidity, 1, "%");
     this._setReading(el.power, this._config.show_power, a.power, 1, "W");
     this._setReading(el.co2, this._config.show_co2, a.co2, 0, " ppm");
+    // What the climate is doing. By default only when there's no power
+    // reading, which already tells whether it's heating.
+    const showAction = this._config.show_action ?? !(this._config.show_power && a.power != null);
+    el.action.hidden = !showAction || !action;
+    if (!el.action.hidden) {
+      el.action.querySelector("span").textContent = this._hass.formatEntityAttributeValue
+        ? this._hass.formatEntityAttributeValue(stateObj, "hvac_action")
+        : action;
+    }
 
     // Target temperature bar. Hidden when the heater has no target
     // temperature (no temperature sensors configured).
@@ -503,6 +657,101 @@ class ElectricalHeaterCard extends HTMLElement {
         this._showBoost(minutes);
       }
     }
+
+    this._updateEntityRows();
+  }
+
+  /** Create one row per extra entity (once per config). */
+  _buildEntityRows() {
+    const box = this._el.entities;
+    box.replaceChildren();
+    this._rows = this._config.entities.map((conf) => {
+      const domain = conf.entity.split(".")[0];
+      const row = document.createElement("div");
+      row.className = "row";
+
+      // HA's own state icon (right icon per device class and state).
+      const icon = document.createElement("ha-state-icon");
+      icon.className = "row-icon";
+      if (conf.icon) icon.icon = conf.icon;
+
+      const name = document.createElement("button");
+      name.type = "button";
+      name.className = "row-name";
+      name.addEventListener("click", () => this._moreInfo(conf.entity));
+
+      let value;
+      if (TOGGLE_DOMAINS.includes(domain)) {
+        value = document.createElement("button");
+        value.type = "button";
+        value.className = "toggle";
+        value.setAttribute("role", "switch");
+        value.addEventListener("click", () => this._toggleEntity(conf.entity));
+      } else if (BUTTON_DOMAINS[domain]) {
+        const [service, label] = BUTTON_DOMAINS[domain];
+        value = document.createElement("button");
+        value.type = "button";
+        value.className = "row-action";
+        value.textContent = label;
+        value.addEventListener("click", () =>
+          this._hass.callService(domain, service, { entity_id: conf.entity })
+        );
+      } else {
+        value = document.createElement("span");
+        value.className = "row-value";
+      }
+
+      row.append(icon, name, value);
+      box.append(row);
+      return { conf, domain, row, icon, name, value };
+    });
+  }
+
+  /** Refresh the extra entity rows with the current states. */
+  _updateEntityRows() {
+    this._el.entities.hidden = this._rows.length === 0;
+    for (const r of this._rows) {
+      const stateObj = this._hass.states[r.conf.entity];
+      const unavailable = !stateObj || stateObj.state === "unavailable";
+      r.row.classList.toggle("unavailable", unavailable);
+      r.name.textContent =
+        r.conf.name || (stateObj && stateObj.attributes.friendly_name) || r.conf.entity;
+
+      r.icon.hass = this._hass;
+      r.icon.stateObj = stateObj;
+      // Coloured like the Entities card: active colour while on.
+      const on = stateObj && stateObj.state === "on";
+      r.icon.style.color = on
+        ? `var(--state-${r.domain}-on-color, var(--state-${r.domain}-active-color, var(--state-active-color, #ffc107)))`
+        : "";
+
+      if (r.value.classList.contains("toggle")) {
+        r.value.setAttribute("aria-checked", String(!!on));
+        r.value.setAttribute("aria-label", r.name.textContent);
+        r.value.disabled = unavailable;
+      } else if (r.value.classList.contains("row-action")) {
+        r.value.disabled = unavailable;
+      } else {
+        r.value.textContent = this._formatState(stateObj);
+      }
+    }
+  }
+
+  /** An entity's state as Home Assistant shows it, e.g. "20.4 °C" or "Off". */
+  _formatState(stateObj) {
+    if (!stateObj) return "Not found";
+    if (this._hass.formatEntityState) return this._hass.formatEntityState(stateObj);
+    const unit = stateObj.attributes.unit_of_measurement;
+    return unit ? `${stateObj.state} ${unit}` : stateObj.state;
+  }
+
+  /** Toggle an extra entity on/off. */
+  _toggleEntity(entityId) {
+    const stateObj = this._hass.states[entityId];
+    if (!stateObj) return;
+    this._hass.callService("homeassistant", stateObj.state === "on" ? "turn_off" : "turn_on", {
+      entity_id: entityId,
+    });
   }
 
   /**
@@ -558,13 +807,14 @@ class ElectricalHeaterCard extends HTMLElement {
   // Actions
   // ------------------------------------------------------------------
 
-  /** Tap on the radiator: switch between Heat and Off. */
+  /** Tap on the heater icon: switch between Off and the "on" mode. */
   _toggleMode() {
     const stateObj = this._hass.states[this._config.entity];
-    if (!stateObj || !(stateObj.attributes.hvac_modes || []).includes("heat")) return;
+    const onMode = stateObj && this._onMode(stateObj.attributes.hvac_modes);
+    if (!onMode) return;
     this._hass.callService("climate", "set_hvac_mode", {
       entity_id: this._config.entity,
-      hvac_mode: stateObj.state === "heat" ? "off" : "heat",
+      hvac_mode: stateObj.state === "off" ? onMode : "off",
     });
   }
 
@@ -574,7 +824,7 @@ class ElectricalHeaterCard extends HTMLElement {
    */
   _stepTarget(direction) {
     const a = this._hass.states[this._config.entity].attributes;
-    const step = Number(a.target_temp_step) || 0.5;
+    const step = Number(a.target_temp_step) || (this._tempUnit() === "°F" ? 1 : 0.5);
     const current = this._pendingTarget ?? Number(a.temperature);
     if (!Number.isFinite(current)) return;
 
@@ -629,6 +879,18 @@ class ElectricalHeaterCard extends HTMLElement {
         e.entity_id.startsWith("number.")
     );
     return match ? match.entity_id : null;
+  }
+
+  /**
+   * The mode the icon switches to: Heat if available, else the first mode
+   * that isn't Off (e.g. Auto). Null if the entity can only be Off, or
+   * can't be switched off at all.
+   */
+  _onMode(modes) {
+    modes = modes || [];
+    if (!modes.includes("off")) return null;
+    if (modes.includes("heat")) return "heat";
+    return modes.find((m) => m !== "off") || null;
   }
 
   /** "°C" or "°F", from the Home Assistant unit system. */

@@ -36,7 +36,7 @@ SETTINGS = {
 }
 
 
-async def _setup(hass: HomeAssistant, temps=(18.0, 18.0)) -> MockConfigEntry:
+async def _setup(hass: HomeAssistant, temps=(18.0, 18.0), **settings) -> MockConfigEntry:
     """Create the component entities and a configured heater."""
     await async_setup_component(hass, "homeassistant", {})
     await async_setup_component(hass, "input_boolean", {"input_boolean": {"heater": None}})
@@ -57,6 +57,7 @@ async def _setup(hass: HomeAssistant, temps=(18.0, 18.0)) -> MockConfigEntry:
             "humidity_sensors": [HUMIDITY, HUMIDITY2],
             "co2_sensor": None,
             **SETTINGS,
+            **settings,
         },
     )
     entry.add_to_hass(hass)
@@ -464,3 +465,73 @@ async def test_options_remove_temperature_sensors(hass: HomeAssistant) -> None:
     assert hass.states.get(SWITCH).state == "off"
     assert hass.states.get("sensor.office_heater_temperature") is None
     assert hass.states.get("binary_sensor.office_heater_temperature_sensor_problem") is None
+
+
+async def _flip_by_hand(hass: HomeAssistant, state: str) -> None:
+    """Simulate the switch being turned on/off at the device itself."""
+    hass.states.async_set(SWITCH, state)
+    await hass.async_block_till_done()
+
+
+async def test_manual_switch_disabled_keeps_old_behaviour(hass: HomeAssistant) -> None:
+    """Without manual boost the thermostat still overrules a hand-switched heater."""
+    await _setup(hass, temps=(25.0, 25.0))
+    await _set_mode(hass, "heat")
+    await _flip_by_hand(hass, "on")
+    assert hass.states.get(SWITCH).state == "off"  # warm enough: turned off again
+    assert hass.states.get(BOOST).state == "0"
+
+
+async def test_manual_switch_starts_and_cancels_boost(hass: HomeAssistant, freezer) -> None:
+    """Switching on by hand starts a boost; switching off cancels it."""
+    await _setup(hass, temps=(25.0, 25.0), manual_boost_minutes=30.0)
+    await _set_mode(hass, "heat")
+
+    # On by hand: boost of 30 min, heater stays on although it's warm.
+    await _flip_by_hand(hass, "on")
+    assert hass.states.get(SWITCH).state == "on"
+    assert hass.states.get(BOOST).state == "30"
+
+    # Off by hand: boost cancelled, mode off, heater stays off.
+    await _flip_by_hand(hass, "off")
+    assert hass.states.get(SWITCH).state == "off"
+    assert hass.states.get(BOOST).state == "0"
+    assert hass.states.get(CLIMATE).state == "off"
+
+    # On by hand again (mode off): boost runs and switches off when it ends.
+    await _flip_by_hand(hass, "on")
+    assert hass.states.get(BOOST).state == "30"
+    freezer.tick(timedelta(minutes=30, seconds=1))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get(SWITCH).state == "off"
+    assert hass.states.get(BOOST).state == "0"
+    # Our own "off" was not mistaken for a hand switch: mode untouched, no boost.
+    assert hass.states.get(CLIMATE).state == "off"
+
+
+async def test_manual_switch_ignores_own_commands(hass: HomeAssistant) -> None:
+    """The thermostat switching the heater doesn't start a boost."""
+    await _setup(hass, temps=(18.0, 18.0), manual_boost_minutes=30.0)
+    await _set_mode(hass, "heat")
+    assert hass.states.get(SWITCH).state == "on"
+    assert hass.states.get(BOOST).state == "0"
+    hass.states.async_set(TEMP1, "21"); hass.states.async_set(TEMP2, "21")
+    await hass.async_block_till_done()
+    assert hass.states.get(SWITCH).state == "off"
+    assert hass.states.get(CLIMATE).state == "heat"
+
+
+async def test_manual_boost_longer_than_max_rejected(hass: HomeAssistant) -> None:
+    """The hand-switch boost can't exceed the maximum boost time."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"name": "Office heater", "heater_switch": SWITCH, "power_sensor": POWER},
+    )
+    bad = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**SETTINGS, "manual_boost_minutes": 90.0}
+    )
+    assert bad["errors"] == {"manual_boost_minutes": "manual_boost_above_max"}
