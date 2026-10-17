@@ -45,7 +45,7 @@
  *                  scripts a button, everything else shows its state.
  */
 
-const CARD_VERSION = "0.5.0";
+const CARD_VERSION = "0.5.1";
 const INTEGRATION = "electrical_heater";
 
 // Material Design Icons (same icons Home Assistant uses), embedded so the
@@ -427,7 +427,10 @@ class ElectricalHeaterCard extends HTMLElement {
     return { columns: 6, min_columns: 6, rows: "auto" };
   }
 
-  /** Form shown by the visual card editor. */
+  /**
+   * Form shown by the visual card editor. Extra entities are edited as a
+   * list where each row has its own entity, name and icon.
+   */
   static getConfigForm() {
     const labels = {
       entity: "Heater",
@@ -468,10 +471,35 @@ class ElectricalHeaterCard extends HTMLElement {
             { name: "show_boost", selector: { boolean: {} } },
           ],
         },
-        // A list of entity ids. Custom names/icons per row: use YAML.
-        { name: "entities", selector: { entity: { multiple: true } } },
+        // A list of rows, each with its own entity, name and icon. Plain
+        // entity ids (allowed in YAML) can't be shown here; see assertConfig.
+        {
+          name: "entities",
+          selector: {
+            object: {
+              multiple: true,
+              label_field: "entity",
+              description_field: "name",
+              fields: {
+                entity: { label: "Entity", required: true, selector: { entity: {} } },
+                name: { label: "Name (optional)", selector: { text: {} } },
+                icon: { label: "Icon (optional)", selector: { icon: {} } },
+              },
+            },
+          },
+        },
       ],
       computeLabel: (schema) => labels[schema.name] || schema.name,
+      // The visual editor only understands rows written as { entity: ... }.
+      // For short "- sensor.x" rows, Home Assistant shows the YAML editor
+      // with this message instead of silently dropping data.
+      assertConfig: (config) => {
+        if ((config.entities || []).some((e) => typeof e === "string")) {
+          throw new Error(
+            "To use the visual editor, write each extra entity as '- entity: sensor.x' in YAML."
+          );
+        }
+      },
     };
   }
 

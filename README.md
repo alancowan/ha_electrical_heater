@@ -86,7 +86,9 @@ entity doesn't support, such as power or boost, are simply hidden.
 - **Boost slider:** runs the heater for the chosen time. The label shows the time left (e.g. `15 min`, `2h 30m`).
 - **Extra entities:** optional rows underneath, like the Entities card. Switches and input
   booleans get a toggle, buttons and scripts a button, everything else shows its state. Tap a
-  name for its details.
+  name for its details. In the visual editor each row has its own entity, name and icon. Rows
+  written in YAML as a plain entity id (`- sensor.x`) work too, but then the card opens in the
+  YAML editor; write them as `- entity: sensor.x` to use the visual editor.
 
 Colours, borders and corners come from your Home Assistant theme.
 
