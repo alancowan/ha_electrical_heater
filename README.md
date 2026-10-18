@@ -31,11 +31,11 @@ All of these can be changed later under **Settings → Devices & services → El
 
 | Setting | Default | Meaning |
 |---|---|---|
-| Min / max temperature | 7 / 30 | Range of the target temperature |
+| Min / max temperature | 7 / 30 | Range of the target temperature. Up to 120°, so it also works for a sauna |
 | Temperature step | 0.5 | How much one + / − press changes the target |
 | Default target | 10 | Target on first start (afterwards the last value is restored) |
 | Cold tolerance | 0.3 | Heater turns **on** at `target − cold tolerance` |
-| Hot tolerance | 0.3 | Heater turns **off** at `target + hot tolerance` |
+| Hot tolerance | 0.3 | Heater turns **off** at `target + hot tolerance` (tolerances up to 10°) |
 | Power threshold | 10 W | Above this the heater counts as heating |
 | Sensor stale after | 3 h (max 24) | A temperature or humidity sensor that hasn't reported for this long is ignored |
 | Minimum cycle time | 0 min | Minimum time the switch stays on or off before the thermostat toggles it again (protects relays) |

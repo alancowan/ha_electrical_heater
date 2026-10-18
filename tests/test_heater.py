@@ -535,3 +535,33 @@ async def test_manual_boost_longer_than_max_rejected(hass: HomeAssistant) -> Non
         result["flow_id"], {**SETTINGS, "manual_boost_minutes": 90.0}
     )
     assert bad["errors"] == {"manual_boost_minutes": "manual_boost_above_max"}
+
+
+async def test_sauna_temperatures(hass: HomeAssistant) -> None:
+    """Settings accept sauna temperatures and the thermostat uses them."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"name": "Sauna", "heater_switch": SWITCH, "temperature_sensors": [TEMP1], "power_sensor": POWER},
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {**SETTINGS, "min_temp": 40.0, "max_temp": 110.0, "default_target_temp": 80.0,
+         "cold_tolerance": 3.0, "hot_tolerance": 2.0},
+    )
+    assert result["type"] == "create_entry"
+
+
+async def test_sauna_heats_to_high_target(hass: HomeAssistant) -> None:
+    """With a 100° max the target can be set to 90 and the heater runs."""
+    await _setup(hass, temps=(60.0, 60.0), max_temp=100.0)
+    await _set_mode(hass, "heat")
+    await hass.services.async_call(
+        "climate", "set_temperature", {"entity_id": CLIMATE, "temperature": 90}, blocking=True
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get(CLIMATE).attributes["temperature"] == 90
+    assert hass.states.get(CLIMATE).attributes["max_temp"] == 100
+    assert hass.states.get(SWITCH).state == "on"

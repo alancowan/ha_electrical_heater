@@ -57,6 +57,8 @@ from .const import (
     DEFAULT_TEMP_STEP,
     DOMAIN,
     MAX_BOOST_MINUTES,
+    MAX_SETTABLE_TEMP,
+    MAX_TOLERANCE,
     MAX_STALE_HOURS,
 )
 
@@ -131,17 +133,17 @@ def settings_schema(current: dict[str, Any]) -> vol.Schema:
 
     return vol.Schema(
         {
-            vol.Required(CONF_MIN_TEMP, default=default(CONF_MIN_TEMP, DEFAULT_MIN_TEMP)): _number(0, 40, 0.5, "°"),
-            vol.Required(CONF_MAX_TEMP, default=default(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)): _number(5, 50, 0.5, "°"),
+            vol.Required(CONF_MIN_TEMP, default=default(CONF_MIN_TEMP, DEFAULT_MIN_TEMP)): _number(0, MAX_SETTABLE_TEMP, 0.5, "°"),
+            vol.Required(CONF_MAX_TEMP, default=default(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)): _number(5, MAX_SETTABLE_TEMP, 0.5, "°"),
             vol.Required(CONF_TEMP_STEP, default=str(default(CONF_TEMP_STEP, DEFAULT_TEMP_STEP))): selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=["0.1", "0.5", "1.0"],
                     mode=selector.SelectSelectorMode.LIST,
                 )
             ),
-            vol.Required(CONF_DEFAULT_TARGET, default=default(CONF_DEFAULT_TARGET, DEFAULT_TARGET_TEMP)): _number(0, 50, 0.5, "°"),
-            vol.Required(CONF_COLD_TOLERANCE, default=default(CONF_COLD_TOLERANCE, DEFAULT_COLD_TOLERANCE)): _number(0, 5, 0.1, "°"),
-            vol.Required(CONF_HOT_TOLERANCE, default=default(CONF_HOT_TOLERANCE, DEFAULT_HOT_TOLERANCE)): _number(0, 5, 0.1, "°"),
+            vol.Required(CONF_DEFAULT_TARGET, default=default(CONF_DEFAULT_TARGET, DEFAULT_TARGET_TEMP)): _number(0, MAX_SETTABLE_TEMP, 0.5, "°"),
+            vol.Required(CONF_COLD_TOLERANCE, default=default(CONF_COLD_TOLERANCE, DEFAULT_COLD_TOLERANCE)): _number(0, MAX_TOLERANCE, 0.1, "°"),
+            vol.Required(CONF_HOT_TOLERANCE, default=default(CONF_HOT_TOLERANCE, DEFAULT_HOT_TOLERANCE)): _number(0, MAX_TOLERANCE, 0.1, "°"),
             vol.Required(CONF_POWER_THRESHOLD, default=default(CONF_POWER_THRESHOLD, DEFAULT_POWER_THRESHOLD)): _number(0, 10000, 1, "W"),
             vol.Required(CONF_STALE_HOURS, default=default(CONF_STALE_HOURS, DEFAULT_STALE_HOURS)): _number(0.5, MAX_STALE_HOURS, 0.5, "h"),
             vol.Required(CONF_MIN_CYCLE_MINUTES, default=default(CONF_MIN_CYCLE_MINUTES, DEFAULT_MIN_CYCLE_MINUTES)): _number(0, 60, 1, "min"),

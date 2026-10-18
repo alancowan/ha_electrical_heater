@@ -60,6 +60,10 @@ DEFAULT_MANUAL_BOOST_MINUTES = 0
 # Hard limits enforced by the config flow
 MAX_STALE_HOURS = 24
 MAX_BOOST_MINUTES = 1440  # 24 hours
+# Highest temperature the settings accept: room heaters and saunas (~80-110 °C).
+MAX_SETTABLE_TEMP = 120
+# Largest hysteresis; a sauna needs a wider band than a room.
+MAX_TOLERANCE = 10
 
 # The dashboard card: file in frontend/ and the URL it is served at.
 CARD_FILENAME = "electrical-heater-card.js"
