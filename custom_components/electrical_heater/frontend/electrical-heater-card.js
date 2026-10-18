@@ -7,7 +7,7 @@
  *   │          Room name           │  tap: open the heater's details
  *   │   [radiator]   🌡 18.4°C     │  tap radiator: Heat <-> Off
  *   │                💧 65.2%      │
- *   │                ⚡ 824.1W     │
+ *   │                ⚡ 824W       │
  *   │ ┌──────────────────────────┐ │
  *   │ │  −        25.0        +  │ │  target temperature (hidden for a
  *   │ │                          │ │  heater without temperature sensors)
@@ -45,7 +45,7 @@
  *                  scripts a button, everything else shows its state.
  */
 
-const CARD_VERSION = "0.5.1";
+const CARD_VERSION = "0.5.3";
 const INTEGRATION = "electrical_heater";
 
 // Material Design Icons (same icons Home Assistant uses), embedded so the
@@ -646,7 +646,7 @@ class ElectricalHeaterCard extends HTMLElement {
     // or when the heater has no such sensor.
     this._setReading(el.temp, true, a.current_temperature, 1, unit);
     this._setReading(el.humidity, this._config.show_humidity, a.current_humidity, 1, "%");
-    this._setReading(el.power, this._config.show_power, a.power, 1, "W");
+    this._setReading(el.power, this._config.show_power, a.power, 0, "W");
     this._setReading(el.co2, this._config.show_co2, a.co2, 0, " ppm");
     // What the climate is doing. By default only when there's no power
     // reading, which already tells whether it's heating.
