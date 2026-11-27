@@ -6,7 +6,7 @@
  *   ┌──────────────────────────────┐
  *   │          Room name           │  tap: open the heater's details
  *   │   [radiator]   🌡 18.4°C     │  tap radiator: Heat <-> Off
- *   │                💧 65.2%      │
+ *   │   (❄ Frost)    💧 65.2%      │  pill while frost protection heats
  *   │                ⚡ 824W       │
  *   │ ┌──────────────────────────┐ │
  *   │ │  −        25.0        +  │ │  target temperature (hidden for a
@@ -45,7 +45,7 @@
  *                  scripts a button, everything else shows its state.
  */
 
-const CARD_VERSION = "0.5.3";
+const CARD_VERSION = "0.7.0";
 const INTEGRATION = "electrical_heater";
 
 // Material Design Icons (same icons Home Assistant uses), embedded so the
@@ -62,6 +62,8 @@ const ICONS = {
   power: "M7,2V13H10V22L17,10H13L17,2H7Z",
   co2: "M5,7A2,2 0 0,0 3,9V15A2,2 0 0,0 5,17H8V15H5V9H8V7H5M11,7A2,2 0 0,0 9,9V15A2,2 0 0,0 11,17H13A2,2 0 0,0 15,15V9A2,2 0 0,0 13,7H11M11,9H13V15H11V9M16,10.5V12H19V13.5H17.5A1.5,1.5 0 0,0 16,15V18H20.5V16.5H17.5V15H19A1.5,1.5 0 0,0 20.5,13.5V12A1.5,1.5 0 0,0 19,10.5H16Z",
   cog: "M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z",
+  snowflake:
+    "M20.79,13.95L18.46,14.57L16.46,13.44V10.56L18.46,9.43L20.79,10.05L21.31,8.12L19.54,7.65L20,5.88L18.07,5.36L17.45,7.69L15.45,8.82L13,7.4V5.08L14.71,3.37L13.29,1.96L12,3.25L10.71,1.96L9.29,3.37L11,5.08V7.4L8.5,8.82L6.5,7.69L5.92,5.36L4,5.88L4.46,7.65L2.69,8.12L3.21,10.05L5.54,9.43L7.54,10.56V13.44L5.54,14.57L3.21,13.95L2.69,15.88L4.46,16.35L4,18.12L5.93,18.64L6.55,16.31L8.55,15.18L11,16.6V18.92L9.29,20.63L10.71,22.04L12,20.75L13.29,22.04L14.7,20.63L13,18.92V16.6L15.5,15.18L17.5,16.31L18.12,18.64L20.05,18.12L19.59,16.35L21.36,15.88L20.84,13.95M9.5,10.56L12,9.11L14.5,10.56V13.44L12,14.89L9.5,13.44V10.56Z",
   minus: "M19,13H5V11H19V13Z",
   plus: "M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z",
   fire: "M17.66 11.2C17.43 10.9 17.15 10.64 16.89 10.38C16.22 9.78 15.46 9.35 14.82 8.72C13.33 7.26 13 4.85 13.95 3C13 3.23 12.17 3.75 11.46 4.32C8.87 6.4 7.85 10.07 9.07 13.22C9.11 13.32 9.15 13.42 9.15 13.55C9.15 13.77 9 13.97 8.8 14.05C8.57 14.15 8.33 14.09 8.14 13.93C8.08 13.88 8.04 13.83 8 13.76C6.87 12.33 6.69 10.28 7.45 8.64C5.78 10 4.87 12.3 5 14.47C5.06 14.97 5.12 15.47 5.29 15.97C5.43 16.57 5.7 17.17 6 17.7C7.08 19.43 8.95 20.67 10.96 20.92C13.1 21.19 15.39 20.8 17.03 19.32C18.86 17.66 19.5 15 18.56 12.72L18.43 12.46C18.22 12 17.66 11.2 17.66 11.2M14.5 17.5C14.22 17.74 13.76 18 13.4 18.1C12.28 18.5 11.16 17.94 10.5 17.28C11.69 17 12.4 16.12 12.61 15.23C12.78 14.43 12.46 13.77 12.33 13C12.21 12.26 12.23 11.63 12.5 10.94C12.69 11.32 12.89 11.7 13.13 12C13.9 13 15.11 13.44 15.37 14.8C15.41 14.94 15.43 15.08 15.43 15.23C15.46 16.05 15.1 16.95 14.5 17.5H14.5Z",
@@ -163,8 +165,13 @@ const STYLE = `
     gap: 8px;
     padding: 6px 4px 12px;
   }
-  .heater {
+  /* Holds the heater button and the frost pill, which overlaps the
+     button's lower edge so the card never changes height. */
+  .heater-wrap {
     justify-self: center;
+    position: relative;
+  }
+  .heater {
     display: grid;
     place-items: center;
     width: 84px;
@@ -189,6 +196,34 @@ const STYLE = `
   .heater.idle { color: var(--heater-color); }
   .heater.idle .heater-icon { opacity: 0.45; }
   .heater.off { color: var(--disabled-text-color, #9e9e9e); }
+  /* Lift the icon a little while the frost pill covers its bottom. */
+  .heater.has-frost .heater-icon { transform: translateY(-7px); }
+
+  /* "❄ Frost" pill: shown while frost protection keeps the room warm. */
+  .frost-pill {
+    position: absolute;
+    left: 50%;
+    bottom: 2px;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 8px 1px 5px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: nowrap;
+    color: var(--state-climate-cool-color, #2b9af9);
+    /* Tinted from the theme's secondary background (dark on dark themes,
+       light grey on light ones) and blurred, so it reads over the icon. */
+    background: color-mix(in srgb, var(--state-climate-cool-color, #2b9af9) 22%, var(--secondary-background-color, #e5e5e5));
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--state-climate-cool-color, #2b9af9) 35%, transparent);
+  }
+  .frost-pill[hidden] { display: none; }
+  .frost-pill svg { width: 13px; height: 13px; flex: none; }
 
   .readings {
     list-style: none;
@@ -531,7 +566,10 @@ class ElectricalHeaterCard extends HTMLElement {
         <div class="content">
           <button class="title" type="button"></button>
           <div class="body">
-            <button class="heater" type="button"></button>
+            <div class="heater-wrap">
+              <button class="heater" type="button"></button>
+              <button class="frost-pill" type="button" hidden>${svg(ICONS.snowflake)}<span>Frost</span></button>
+            </div>
             <ul class="readings">
               <li class="r-temp">${svg(ICONS.thermometer)}<span></span></li>
               <li class="r-humidity">${svg(ICONS.humidity)}<span></span></li>
@@ -562,6 +600,7 @@ class ElectricalHeaterCard extends HTMLElement {
       warning: $(".warning"),
       title: $(".title"),
       heater: $(".heater"),
+      frost: $(".frost-pill"),
       temp: $(".r-temp"),
       humidity: $(".r-humidity"),
       power: $(".r-power"),
@@ -579,6 +618,10 @@ class ElectricalHeaterCard extends HTMLElement {
 
     this._el.title.addEventListener("click", () => this._moreInfo(this._config.entity));
     this._el.heater.addEventListener("click", () => this._toggleMode());
+    // The frost pill opens the frost protection slider (or the heater).
+    this._el.frost.addEventListener("click", () =>
+      this._moreInfo(this._deviceNumber("frost_protection") || this._config.entity)
+    );
     this._el.minus.addEventListener("click", () => this._stepTarget(-1));
     this._el.plus.addEventListener("click", () => this._stepTarget(1));
 
@@ -623,10 +666,17 @@ class ElectricalHeaterCard extends HTMLElement {
 
     // Heater icon: colour + shape reflect what the heater is doing.
     //   active: heating/cooling now; idle: on but waiting; off.
+    //   Frost protection keeping the room warm counts as active (heating).
     const isOn = mode !== "off" && mode !== "unavailable" && mode !== "unknown";
-    const look = ACTION_COLORS[action] ? "active" : isOn || action === "idle" ? "idle" : "off";
-    el.heater.className = `heater ${look}`;
-    el.heater.style.setProperty("--heater-color", ACTION_COLORS[action] || MODE_COLORS[mode] || MODE_COLORS.heat);
+    const frost = a.frost_protection_active === true;
+    const look = ACTION_COLORS[action] || frost ? "active" : isOn || action === "idle" ? "idle" : "off";
+    el.heater.className = `heater ${look}${frost ? " has-frost" : ""}`;
+    el.heater.style.setProperty(
+      "--heater-color",
+      ACTION_COLORS[action] || (frost ? MODE_COLORS.heat : MODE_COLORS[mode]) || MODE_COLORS.heat
+    );
+    el.frost.hidden = !frost;
+    el.frost.setAttribute("aria-label", "Frost protection is heating. Show frost protection");
     this._setHeaterIcon(look === "off");
 
     // Tapping the icon switches between Off and the "on" mode (Heat if the
@@ -893,19 +943,36 @@ class ElectricalHeaterCard extends HTMLElement {
 
   /**
    * Find the heater's boost slider. Uses `boost_entity` if set, otherwise
-   * looks for the number entity of this integration on the same device.
+   * looks for this integration's boost number entity on the same device
+   * (not the frost protection one, which is a number entity too).
    */
   _boostEntityId() {
     if (this._config.boost_entity) return this._config.boost_entity;
+    return this._deviceNumber("boost");
+  }
+
+  /**
+   * Find one of this integration's number entities ("boost" or
+   * "frost_protection") on the same device as the climate entity.
+   */
+  _deviceNumber(key) {
     const entities = this._hass.entities || {};
     const climate = entities[this._config.entity];
     if (!climate || !climate.device_id) return null;
-    const match = Object.values(entities).find(
+    const numbers = Object.values(entities).filter(
       (e) =>
         e.device_id === climate.device_id &&
         e.platform === INTEGRATION &&
         e.entity_id.startsWith("number.")
     );
+    // translation_key identifies it even if the entity was renamed. Without
+    // it (older Home Assistant), go by the entity id.
+    const match =
+      numbers.find((e) => e.translation_key === key) ||
+      numbers.find((e) =>
+        !e.translation_key &&
+        (key === "boost" ? !e.entity_id.includes("frost") : e.entity_id.includes("frost"))
+      );
     return match ? match.entity_id : null;
   }
 

@@ -18,6 +18,8 @@ One device with these entities:
   `hvac_action` is *heating* / *idle* / *off*, based on the power sensor.
 - **`number.<name>_boost`**: slider from 0 up to the maximum boost time (60 min by default, up to 24 h). Runs the heater for that long whatever the
   mode or temperature, then counts down. Set it to 0 to cancel.
+- **`number.<name>_frost_protection`**: slider from 0 (off) to 12°, starting at 12. In **Off** mode the heater
+  still keeps the room at least this warm (see *Frost protection* below). Kept over restarts. Only with temperature sensors.
 - **`sensor.<name>_temperature`**: the averaged temperature the thermostat uses (only with temperature sensors).
 - **`sensor.<name>_humidity`**: the averaged humidity (only when humidity sensors are configured).
 - **`binary_sensor.<name>_heating`**: on while power is above the threshold.
@@ -34,7 +36,6 @@ All of these can be changed later under **Settings → Devices & services → El
 | Min / max temperature | 7 / 30 | Range of the target temperature. Up to 120°, so it also works for a sauna |
 | Temperature step | 0.5 | How much one + / − press changes the target |
 | Default target | 10 | Target on first start (afterwards the last value is restored) |
-| Frost protection | 12 | In **Off** mode the heater still keeps the room at least this warm, using the tolerances below. Set per heater; 0 turns it off. Needs temperature sensors |
 | Cold tolerance | 0.3 | Heater turns **on** at `target − cold tolerance` |
 | Hot tolerance | 0.3 | Heater turns **off** at `target + hot tolerance` (tolerances up to 10°) |
 | Power threshold | 10 W | Above this the heater counts as heating |
@@ -54,7 +55,8 @@ All of these can be changed later under **Settings → Devices & services → El
   turns on until it reaches `frost + hot tolerance`, then turns off again. It only turns the switch off
   when it turned it on itself, and it always wins: switching off at the device while it's this cold
   turns the heater straight back on. If no temperature sensor is usable it stops and turns the heater off.
-  The climate entity's `frost_protection_active` attribute is `true` while it wants heat.
+  Set it per heater with the frost protection slider (0 turns it off). The climate entity's
+  `frost_protection_active` attribute is `true` while it wants heat.
 - **Boost** overrides everything, and it is **not** resumed after a Home Assistant restart.
 - **Switching by hand:** with *Boost when switched on by hand* set to 0, the thermostat corrects a
   heater switched on at the device (e.g. turns it off again in Heat mode when it's warm enough).
@@ -87,6 +89,8 @@ entity doesn't support, such as power or boost, are simply hidden.
 - **Title:** tap it to open the heater's details.
 - **Heater icon:** tap it to switch Heat / Off. It's orange with a glow while heating, faded
   orange when on but warm enough, and grey when off.
+  While frost protection is heating (in Off mode) it glows orange too, with a blue **❄ Frost** pill
+  over its lower edge; tap the pill to open the frost protection slider.
 - **Readings:** temperature, humidity, power and CO2 (each can be hidden).
 - **− / +:** change the target. Quick presses are sent as one change.
 - **Boost slider:** runs the heater for the chosen time. The label shows the time left (e.g. `15 min`, `2h 30m`).

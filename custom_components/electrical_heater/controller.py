@@ -71,6 +71,7 @@ from .const import (
     CONF_TEMP_STEP,
     DEFAULT_COLD_TOLERANCE,
     DEFAULT_FROST_TEMP,
+    MAX_FROST_TEMP,
     DEFAULT_HOT_TOLERANCE,
     DEFAULT_MANUAL_BOOST_MINUTES,
     DEFAULT_MAX_BOOST_MINUTES,
@@ -150,7 +151,12 @@ class HeaterController:
             conf.get(CONF_MANUAL_BOOST_MINUTES, DEFAULT_MANUAL_BOOST_MINUTES)
         )
         # Lowest temperature kept in mode OFF (0 = frost protection off).
-        self.frost_temp = float(conf.get(CONF_FROST_TEMP, DEFAULT_FROST_TEMP))
+        # Set with the frost protection number entity, which restores its last
+        # value before switching starts; this is the value until then. A value
+        # set in Configure by version 0.6.0 is the starting point.
+        self.frost_temp = self._clamp_frost(
+            float(conf.get(CONF_FROST_TEMP, DEFAULT_FROST_TEMP))
+        )
 
         # Runtime state. hvac_mode / target are overwritten by the climate
         # entity when it restores the values from before a restart.
@@ -479,6 +485,16 @@ class HeaterController:
         """Change the target temperature (clamped to min/max)."""
         self.target_temperature = self._clamp(temperature)
         await self.async_control()
+
+    async def async_set_frost_temp(self, temperature: float) -> None:
+        """Change the frost protection temperature (0 = off, max 12)."""
+        self.frost_temp = self._clamp_frost(temperature)
+        await self.async_control()
+
+    @staticmethod
+    def _clamp_frost(temperature: float) -> float:
+        """Keep the frost protection temperature between 0 (off) and the max."""
+        return max(0.0, min(MAX_FROST_TEMP, temperature))
 
     def _clamp(self, temperature: float) -> float:
         """Keep a temperature within the configured min/max range."""

@@ -14,7 +14,7 @@ DOMAIN = "electrical_heater"
 # Entity platforms this integration creates. Each one maps to a .py file.
 PLATFORMS: list[Platform] = [
     Platform.CLIMATE,  # The thermostat itself (heat / off, target temperature)
-    Platform.NUMBER,  # The boost slider (0-60 minutes)
+    Platform.NUMBER,  # The boost slider and the frost protection slider
     Platform.SENSOR,  # The combined/average temperature
     Platform.BINARY_SENSOR,  # "Heating" (from power) and "Sensor problem"
 ]
@@ -42,7 +42,8 @@ CONF_MIN_CYCLE_MINUTES = "min_cycle_minutes"  # Minimum time between switch togg
 CONF_MAX_BOOST_MINUTES = "max_boost_minutes"  # Upper limit of the boost slider
 # Minutes of boost started when the switch is turned on by hand (0 = off)
 CONF_MANUAL_BOOST_MINUTES = "manual_boost_minutes"
-# In mode OFF, keep the room at least this warm (0 = frost protection off)
+# Frost protection temperature as set in Configure by version 0.6.0. It is now
+# a number entity; this old value is only used as its starting value.
 CONF_FROST_TEMP = "frost_protection_temp"
 
 # --- Defaults ---------------------------------------------------------------
@@ -58,7 +59,8 @@ DEFAULT_STALE_HOURS = 3
 DEFAULT_MIN_CYCLE_MINUTES = 0
 DEFAULT_MAX_BOOST_MINUTES = 60
 DEFAULT_MANUAL_BOOST_MINUTES = 0
-DEFAULT_FROST_TEMP = 12.0
+DEFAULT_FROST_TEMP = 12.0  # Frost protection slider starts here
+MAX_FROST_TEMP = 12.0  # Highest value of the frost protection slider (0 = off)
 
 # Hard limits enforced by the config flow
 MAX_STALE_HOURS = 24

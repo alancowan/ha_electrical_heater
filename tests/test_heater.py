@@ -21,6 +21,7 @@ HUMIDITY = "sensor.humidity"
 HUMIDITY2 = "sensor.humidity2"
 CLIMATE = "climate.office_heater"
 BOOST = "number.office_heater_boost"
+FROST = "number.office_heater_frost_protection"
 
 SETTINGS = {
     "min_temp": 7.0,
@@ -572,8 +573,25 @@ async def _set_temp(hass: HomeAssistant, value: float) -> None:
     await hass.async_block_till_done()
 
 
-async def test_frost_protection_default_is_12(hass: HomeAssistant) -> None:
-    """New heaters get frost protection at 12°."""
+async def _set_frost(hass: HomeAssistant, value: float) -> None:
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": FROST, "value": value}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+
+async def test_frost_protection_entity(hass: HomeAssistant) -> None:
+    """Frost protection is a 0-12 slider on the device, starting at 12."""
+    await _setup(hass)
+    state = hass.states.get(FROST)
+    assert float(state.state) == 12.0
+    assert state.attributes["min"] == 0
+    assert state.attributes["max"] == 12
+    assert state.attributes["step"] == 0.5
+
+
+async def test_frost_protection_not_in_configure(hass: HomeAssistant) -> None:
+    """The settings form no longer has a frost protection field."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
@@ -581,10 +599,45 @@ async def test_frost_protection_default_is_12(hass: HomeAssistant) -> None:
         result["flow_id"],
         {"name": "Office heater", "heater_switch": SWITCH, "power_sensor": POWER},
     )
-    defaults = {
-        str(key): key.default() for key in result["data_schema"].schema if callable(key.default)
-    }
-    assert defaults["frost_protection_temp"] == 12.0
+    assert "frost_protection_temp" not in {str(k) for k in result["data_schema"].schema}
+
+
+async def test_frost_protection_above_max_rejected(hass: HomeAssistant) -> None:
+    """The slider can't go above 12."""
+    import pytest
+    from homeassistant.exceptions import ServiceValidationError
+
+    await _setup(hass)
+    with pytest.raises(ServiceValidationError):
+        await _set_frost(hass, 15)
+
+
+async def test_frost_protection_old_setting_is_start_value(hass: HomeAssistant) -> None:
+    """A value set in Configure by 0.6.0 is the starting value, capped at 12."""
+    await _setup(hass, frost_protection_temp=8.0)
+    assert float(hass.states.get(FROST).state) == 8.0
+
+
+async def test_frost_protection_restored(hass: HomeAssistant) -> None:
+    """The slider keeps its value over a restart, before any switching."""
+    from homeassistant.core import State
+    from pytest_homeassistant_custom_component.common import mock_restore_cache_with_extra_data
+
+    mock_restore_cache_with_extra_data(
+        hass, [(State(FROST, "0"), {
+            "native_value": 0.0, "native_min_value": 0.0, "native_max_value": 12.0,
+            "native_step": 0.5, "native_unit_of_measurement": "°C",
+        })]
+    )
+    await _setup(hass, temps=(5.0, 5.0))
+    assert float(hass.states.get(FROST).state) == 0.0
+    assert hass.states.get(SWITCH).state == "off"  # never turned on at 5°
+
+
+async def test_frost_protection_no_entity_without_sensors(hass: HomeAssistant) -> None:
+    """A boost-only heater has no frost protection slider."""
+    await _setup_boost_only(hass)
+    assert hass.states.get(FROST) is None
 
 
 async def test_frost_protection_in_off_mode(hass: HomeAssistant) -> None:
@@ -636,16 +689,22 @@ async def test_frost_protection_sensor_failure_turns_off(hass: HomeAssistant) ->
 
 
 async def test_frost_protection_disabled_with_zero(hass: HomeAssistant) -> None:
-    """Frost temp 0 turns the feature off: mode off stays off when cold."""
-    await _setup(hass, temps=(5.0, 5.0), frost_protection_temp=0.0)
+    """Setting the slider to 0 turns frost protection off (and the heater it ran)."""
+    await _setup(hass, temps=(5.0, 5.0))
+    assert hass.states.get(SWITCH).state == "on"
+    await _set_frost(hass, 0)
     assert hass.states.get(SWITCH).state == "off"
     assert hass.states.get(CLIMATE).attributes["frost_protection_active"] is False
+    await _set_temp(hass, 4.0)
+    assert hass.states.get(SWITCH).state == "off"
 
 
 async def test_frost_protection_per_heater(hass: HomeAssistant) -> None:
     """Each heater has its own frost temperature."""
-    await _setup(hass, temps=(14.0, 14.0), frost_protection_temp=15.0)
+    await _setup(hass, temps=(10.0, 10.0))
     assert hass.states.get(SWITCH).state == "on"
+    await _set_frost(hass, 9)  # 10 >= 9 + 0.3: warm enough now
+    assert hass.states.get(SWITCH).state == "off"
 
 
 async def test_frost_protection_after_boost(hass: HomeAssistant, freezer) -> None:
