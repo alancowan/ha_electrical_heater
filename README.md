@@ -94,6 +94,7 @@ entity doesn't support, such as power or boost, are simply hidden.
 - **Readings:** temperature, humidity, power and CO2 (each can be hidden).
 - **− / +:** change the target. Quick presses are sent as one change.
 - **Boost slider:** runs the heater for the chosen time. The label shows the time left (e.g. `15 min`, `2h 30m`).
+- **Frost slider** (optional, `show_frost`): sets the frost protection temperature, e.g. `Frost 12°` or `Frost off`.
 - **Extra entities:** optional rows underneath, like the Entities card. Switches and input
   booleans get a toggle, buttons and scripts a button, everything else shows its state. Tap a
   name for its details. In the visual editor each row has its own entity, name and icon. Rows
@@ -114,6 +115,7 @@ Colours, borders and corners come from your Home Assistant theme.
 | `show_action` | when there's no power reading | Show what the climate is doing (idle, heating) |
 | `show_boost` | `true` | Show the boost slider |
 | `boost_entity` | found automatically | Boost number entity, only needed in unusual setups |
+| `show_frost` | `false` | Show a frost protection slider (0 = off to 12°) below Boost. Its snowflake turns blue while frost protection is heating |
 | `entities` | none | Extra rows: entity ids, or `{entity, name, icon}` |
 
 ```yaml

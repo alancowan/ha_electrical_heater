@@ -17,6 +17,9 @@
  *   │ │                          │ │  shows the minutes left while boosting
  *   │ └──────────────────────────┘ │
  *   │ ┌──────────────────────────┐ │
+ *   │ │ ❄ Frost 12° ─────────●── │ │  frost protection slider (optional,
+ *   │ └──────────────────────────┘ │  off by default)
+ *   │ ┌──────────────────────────┐ │
  *   │ │ 📅 Program          [●═] │ │  extra entities (optional), like the
  *   │ │ 🌡 Lounge temp    20.4°C │ │  standard Entities card
  *   │ └──────────────────────────┘ │
@@ -40,12 +43,13 @@
  *                  (default: only when there is no power reading)
  *   show_boost:    show the boost slider        (default true)
  *   boost_entity:  number entity for boost; found automatically if omitted
+ *   show_frost:    show the frost protection slider (default false)
  *   entities:      extra rows; each an entity id or
  *                  { entity, name, icon }. Switches get a toggle, buttons and
  *                  scripts a button, everything else shows its state.
  */
 
-const CARD_VERSION = "0.7.0";
+const CARD_VERSION = "0.7.1";
 const INTEGRATION = "electrical_heater";
 
 // Material Design Icons (same icons Home Assistant uses), embedded so the
@@ -303,6 +307,26 @@ const STYLE = `
     cursor: pointer;
   }
 
+  /* Frost protection bar: same layout as Boost, in the theme's cool colour.
+     The icon turns blue while frost protection is heating. */
+  .frost-icon { width: 20px; height: 20px; margin-left: 6px; flex: none; color: var(--secondary-text-color, #727272); }
+  .frost-bar.active .frost-icon { color: var(--state-climate-cool-color, #2b9af9); }
+  .frost-label {
+    flex: none;
+    min-width: 5.4em;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .frost-bar.active .frost-label { font-weight: 600; }
+  .frost-bar input {
+    flex: 1;
+    min-width: 0;
+    margin: 0 8px 0 0;
+    accent-color: var(--state-climate-cool-color, #2b9af9);
+    cursor: pointer;
+  }
+
   /* ---- Extra entities (like the Entities card) ---------------------- */
   .entities {
     margin-top: 8px;
@@ -411,6 +435,7 @@ class ElectricalHeaterCard extends HTMLElement {
     this._pendingTarget = null; // target shown while + / − presses are pending
     this._debounceTimer = null;
     this._sliderActive = false; // true while the user drags the boost slider
+    this._frostSliderActive = false; // same for the frost protection slider
   }
 
   // ------------------------------------------------------------------
@@ -434,6 +459,7 @@ class ElectricalHeaterCard extends HTMLElement {
       show_power: true,
       show_co2: true,
       show_boost: true,
+      show_frost: false,
       ...config,
       // Accept both "sensor.x" and { entity: "sensor.x", name, icon }.
       entities: entities
@@ -454,7 +480,7 @@ class ElectricalHeaterCard extends HTMLElement {
   /** Rough height in rows of 50px, used by the masonry dashboard layout. */
   getCardSize() {
     if (!this._config) return 3;
-    return 3 + (this._config.show_boost ? 1 : 0) + Math.ceil(this._config.entities.length * 0.9);
+    return 3 + (this._config.show_boost ? 1 : 0) + (this._config.show_frost ? 1 : 0) + Math.ceil(this._config.entities.length * 0.9);
   }
 
   /** Default size in the sections (grid) dashboard layout. */
@@ -477,6 +503,7 @@ class ElectricalHeaterCard extends HTMLElement {
       show_co2: "Show CO2",
       show_action: "Show action (idle / heating)",
       show_boost: "Show boost slider",
+      show_frost: "Show frost protection slider",
       entities: "Extra entities (optional)",
     };
     return {
@@ -504,6 +531,7 @@ class ElectricalHeaterCard extends HTMLElement {
             { name: "show_co2", selector: { boolean: {} } },
             { name: "show_action", selector: { boolean: {} } },
             { name: "show_boost", selector: { boolean: {} } },
+            { name: "show_frost", selector: { boolean: {} } },
           ],
         },
         // A list of rows, each with its own entity, name and icon. Plain
@@ -588,6 +616,11 @@ class ElectricalHeaterCard extends HTMLElement {
             <label class="boost-label" for="boost">Boost</label>
             <input id="boost" type="range" min="0" max="60" step="1" value="0" />
           </div>
+          <div class="bar frost-bar">
+            ${svg(ICONS.snowflake, "frost-icon")}
+            <label class="frost-label" for="frost"></label>
+            <input id="frost" type="range" min="0" max="12" step="0.5" value="12" />
+          </div>
           <div class="entities"></div>
         </div>
       </ha-card>
@@ -613,6 +646,9 @@ class ElectricalHeaterCard extends HTMLElement {
       boost: $(".boost"),
       slider: $("#boost"),
       boostLabel: $(".boost-label"),
+      frostBar: $(".frost-bar"),
+      frostSlider: $("#frost"),
+      frostLabel: $(".frost-label"),
       targetBar: $(".bar.target"),
     };
 
@@ -635,6 +671,21 @@ class ElectricalHeaterCard extends HTMLElement {
     slider.addEventListener("change", () => {
       this._sliderActive = false;
       this._setBoost(Number(slider.value));
+    });
+
+    // Frost protection slider: same pattern as Boost.
+    const frostSlider = this._el.frostSlider;
+    frostSlider.addEventListener("pointerdown", () => (this._frostSliderActive = true));
+    frostSlider.addEventListener("input", () => {
+      this._frostSliderActive = true;
+      this._showFrost(Number(frostSlider.value));
+    });
+    frostSlider.addEventListener("change", () => {
+      this._frostSliderActive = false;
+      const frostId = this._deviceNumber("frost_protection");
+      if (frostId) {
+        this._hass.callService("number", "set_value", { entity_id: frostId, value: Number(frostSlider.value) });
+      }
     });
 
     this._buildEntityRows();
@@ -733,6 +784,23 @@ class ElectricalHeaterCard extends HTMLElement {
         const minutes = Number(boostObj.state) || 0;
         el.slider.value = String(minutes);
         this._showBoost(minutes);
+      }
+    }
+
+    // Frost protection bar (off unless show_frost; only Electrical Heaters
+    // with temperature sensors have the entity).
+    const frostId = this._config.show_frost ? this._deviceNumber("frost_protection") : null;
+    const frostObj = frostId ? this._hass.states[frostId] : null;
+    el.frostBar.hidden = !frostObj;
+    if (frostObj) {
+      el.frostBar.classList.toggle("active", frost);
+      el.frostSlider.min = String(frostObj.attributes.min ?? 0);
+      el.frostSlider.max = String(frostObj.attributes.max ?? 12);
+      el.frostSlider.step = String(frostObj.attributes.step ?? 0.5);
+      if (!this._frostSliderActive) {
+        const value = Number(frostObj.state) || 0;
+        el.frostSlider.value = String(value);
+        this._showFrost(value);
       }
     }
 
@@ -874,6 +942,13 @@ class ElectricalHeaterCard extends HTMLElement {
   }
 
   /** 45 -> "45 min", 60 -> "1h", 90 -> "1h 30m", 1440 -> "24h". */
+  /** Label beside the frost slider: "Frost 12°" or "Frost off". */
+  _showFrost(value) {
+    const text = value > 0 ? `${this._fmt(value, value % 1 ? 1 : 0)}°` : "off";
+    this._el.frostLabel.textContent = `Frost ${text}`;
+    this._el.frostSlider.setAttribute("aria-valuetext", value > 0 ? `${text}` : "Off");
+  }
+
   _fmtDuration(minutes) {
     if (minutes < 60) return `${minutes} min`;
     const h = Math.floor(minutes / 60);
