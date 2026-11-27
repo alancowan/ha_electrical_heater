@@ -55,6 +55,7 @@ from .const import (
     CONF_CO2_SENSOR,
     CONF_COLD_TOLERANCE,
     CONF_DEFAULT_TARGET,
+    CONF_FROST_TEMP,
     CONF_HEATER_SWITCH,
     CONF_HOT_TOLERANCE,
     CONF_HUMIDITY_SENSORS,
@@ -69,6 +70,7 @@ from .const import (
     CONF_TEMP_SENSORS,
     CONF_TEMP_STEP,
     DEFAULT_COLD_TOLERANCE,
+    DEFAULT_FROST_TEMP,
     DEFAULT_HOT_TOLERANCE,
     DEFAULT_MANUAL_BOOST_MINUTES,
     DEFAULT_MAX_BOOST_MINUTES,
@@ -147,6 +149,8 @@ class HeaterController:
         self.manual_boost_minutes = int(
             conf.get(CONF_MANUAL_BOOST_MINUTES, DEFAULT_MANUAL_BOOST_MINUTES)
         )
+        # Lowest temperature kept in mode OFF (0 = frost protection off).
+        self.frost_temp = float(conf.get(CONF_FROST_TEMP, DEFAULT_FROST_TEMP))
 
         # Runtime state. hvac_mode / target are overwritten by the climate
         # entity when it restores the values from before a restart.
@@ -157,6 +161,8 @@ class HeaterController:
         self.boost_until: datetime | None = None
         self.temperature = SensorReading()
         self.humidity_reading = SensorReading()
+        # True while frost protection wants the heater on (see _update_frost).
+        self.frost_active = False
 
         # Internal bookkeeping
         self._listeners: list[CALLBACK_TYPE] = []  # entity refresh callbacks
@@ -494,10 +500,13 @@ class HeaterController:
         if self.boost_active:
             return True, True
 
-        # 2. Mode OFF: the heater should be off. (We only enforce this when the
-        #    mode or boost changes - see async_control - so you can still use the
-        #    switch by hand while the thermostat is off.)
+        # 2. Mode OFF: the heater should be off, unless frost protection needs
+        #    heat. (Off is only enforced when the mode, boost or frost protection
+        #    changes - see _async_apply_switch - so you can still use the switch
+        #    by hand while the thermostat is off.)
         if self.hvac_mode == HVACMode.OFF:
+            if self.frost_active:
+                return True, False
             return False, True
 
         # 3. Safety: no usable temperature at all -> turn off.
@@ -512,6 +521,28 @@ class HeaterController:
         if current_on:
             return temp < self.target_temperature + self.hot_tolerance, False
         return temp <= self.target_temperature - self.cold_tolerance, False
+
+    @property
+    def frost_enabled(self) -> bool:
+        """True if frost protection can work: a frost temperature and sensors."""
+        return self.frost_temp > 0 and self.has_thermostat
+
+    def _update_frost(self) -> bool:
+        """Decide whether frost protection needs heat. Returns True if that changed.
+
+        Only in mode OFF. Uses the same hysteresis as the thermostat: heat from
+        ``frost_temp - cold_tolerance`` until ``frost_temp + hot_tolerance``.
+        Without a usable temperature it stops (safety, like Heat mode).
+        """
+        was_active = self.frost_active
+        temp = self.temperature.value
+        if not self.frost_enabled or self.hvac_mode != HVACMode.OFF or temp is None:
+            self.frost_active = False
+        elif temp <= self.frost_temp - self.cold_tolerance:
+            self.frost_active = True
+        elif temp >= self.frost_temp + self.hot_tolerance:
+            self.frost_active = False
+        return self.frost_active != was_active
 
     def _min_cycle_passed(self) -> bool:
         """True if the switch has been in its current state long enough.
@@ -535,19 +566,32 @@ class HeaterController:
         async with self._lock:
             self.temperature = self.read_average(self.temp_sensors)
             self.humidity_reading = self.read_average(self.humidity_sensors)
+            frost_changed = self._update_frost()
 
             # Don't switch anything until HA has started and the previous
             # mode/target have been restored.
             if self._started and self._restored:
-                await self._async_apply_switch(force or self._force_pending)
+                await self._async_apply_switch(
+                    force or self._force_pending, frost_changed
+                )
                 self._force_pending = False
 
         self._notify()
 
-    async def _async_apply_switch(self, force: bool) -> None:
-        """Turn the switch on/off if the logic says it should change."""
-        # Mode OFF and no boost: only act when explicitly forced (user action).
-        if self.hvac_mode == HVACMode.OFF and not self.boost_active and not force:
+    async def _async_apply_switch(self, force: bool, frost_changed: bool = False) -> None:
+        """Turn the switch on/off if the logic says it should change.
+
+        ``frost_changed`` is True when frost protection just started or stopped.
+        """
+        # Mode OFF and no boost: only act when explicitly forced (user action)
+        # or for frost protection (keep heating while needed, off when done).
+        if (
+            self.hvac_mode == HVACMode.OFF
+            and not self.boost_active
+            and not force
+            and not self.frost_active
+            and not frost_changed
+        ):
             return
 
         switch_state = self.hass.states.get(self.switch_entity)
@@ -570,12 +614,13 @@ class HeaterController:
             return
 
         _LOGGER.debug(
-            "%s: turning %s (temp=%s, target=%s, boost=%s)",
+            "%s: turning %s (temp=%s, target=%s, boost=%s, frost=%s)",
             self.switch_entity,
             "on" if desired else "off",
             self.temperature.value,
             self.target_temperature,
             self.boost_active,
+            self.frost_active,
         )
         self._commanded_on = desired
         # homeassistant.turn_on/off works for switch, input_boolean, light, ...

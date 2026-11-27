@@ -26,6 +26,7 @@
           "max_temp": "Maximum temperature",
           "temp_step": "Temperature step (+ / - button)",
           "default_target_temp": "Default target temperature",
+          "frost_protection_temp": "Frost protection",
           "cold_tolerance": "Cold tolerance (hysteresis)",
           "hot_tolerance": "Hot tolerance (hysteresis)",
           "power_threshold": "Power threshold",
@@ -35,6 +36,7 @@
           "manual_boost_minutes": "Boost when switched on by hand"
         },
         "data_description": {
+          "frost_protection_temp": "In mode off, the heater still keeps the room at least this warm (using the cold and hot tolerances). Needs temperature sensors. 0 = off.",
           "cold_tolerance": "Heater turns on when the temperature drops to target minus this value.",
           "hot_tolerance": "Heater turns off when the temperature reaches target plus this value.",
           "power_threshold": "Above this power the heater counts as heating.",
@@ -77,6 +79,7 @@
           "max_temp": "Maximum temperature",
           "temp_step": "Temperature step (+ / - button)",
           "default_target_temp": "Default target temperature",
+          "frost_protection_temp": "Frost protection",
           "cold_tolerance": "Cold tolerance (hysteresis)",
           "hot_tolerance": "Hot tolerance (hysteresis)",
           "power_threshold": "Power threshold",
@@ -86,6 +89,7 @@
           "manual_boost_minutes": "Boost when switched on by hand"
         },
         "data_description": {
+          "frost_protection_temp": "In mode off, the heater still keeps the room at least this warm (using the cold and hot tolerances). Needs temperature sensors. 0 = off.",
           "cold_tolerance": "Heater turns on when the temperature drops to target minus this value.",
           "hot_tolerance": "Heater turns off when the temperature reaches target plus this value.",
           "power_threshold": "Above this power the heater counts as heating.",

@@ -34,6 +34,7 @@ All of these can be changed later under **Settings → Devices & services → El
 | Min / max temperature | 7 / 30 | Range of the target temperature. Up to 120°, so it also works for a sauna |
 | Temperature step | 0.5 | How much one + / − press changes the target |
 | Default target | 10 | Target on first start (afterwards the last value is restored) |
+| Frost protection | 12 | In **Off** mode the heater still keeps the room at least this warm, using the tolerances below. Set per heater; 0 turns it off. Needs temperature sensors |
 | Cold tolerance | 0.3 | Heater turns **on** at `target − cold tolerance` |
 | Hot tolerance | 0.3 | Heater turns **off** at `target + hot tolerance` (tolerances up to 10°) |
 | Power threshold | 10 W | Above this the heater counts as heating |
@@ -49,6 +50,11 @@ All of these can be changed later under **Settings → Devices & services → El
 - **Safety:** in Heat mode, if *no* temperature sensor is usable the heater is switched off.
 - **Off mode:** the switch is turned off when you choose Off. After that the integration leaves
   the switch alone, so you can still use it by hand.
+- **Frost protection:** in Off mode, when the temperature drops to `frost − cold tolerance` the heater
+  turns on until it reaches `frost + hot tolerance`, then turns off again. It only turns the switch off
+  when it turned it on itself, and it always wins: switching off at the device while it's this cold
+  turns the heater straight back on. If no temperature sensor is usable it stops and turns the heater off.
+  The climate entity's `frost_protection_active` attribute is `true` while it wants heat.
 - **Boost** overrides everything, and it is **not** resumed after a Home Assistant restart.
 - **Switching by hand:** with *Boost when switched on by hand* set to 0, the thermostat corrects a
   heater switched on at the device (e.g. turns it off again in Heat mode when it's warm enough).

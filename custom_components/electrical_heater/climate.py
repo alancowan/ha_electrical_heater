@@ -27,6 +27,7 @@ from .const import (
     ATTR_BOOST_ACTIVE,
     ATTR_BOOST_REMAINING,
     ATTR_CO2,
+    ATTR_FROST_ACTIVE,
     ATTR_POWER,
     ATTR_STALE_HUMIDITY_SENSORS,
     ATTR_STALE_SENSORS,
@@ -102,12 +103,17 @@ class ElectricalHeaterClimate(ElectricalHeaterEntity, ClimateEntity, RestoreEnti
         """What the heater is doing right now, based on the power sensor.
 
         * HEATING - drawing power (also during a boost)
-        * IDLE    - mode is HEAT but the heater isn't drawing power
+        * IDLE    - mode is HEAT (or boost / frost protection is on) but the
+                    heater isn't drawing power
         * OFF     - mode is OFF and nothing is running
         """
         if self.controller.is_heating:
             return HVACAction.HEATING
-        if self.controller.hvac_mode == HVACMode.HEAT or self.controller.boost_active:
+        if (
+            self.controller.hvac_mode == HVACMode.HEAT
+            or self.controller.boost_active
+            or self.controller.frost_active
+        ):
             return HVACAction.IDLE
         return HVACAction.OFF
 
@@ -135,6 +141,7 @@ class ElectricalHeaterClimate(ElectricalHeaterEntity, ClimateEntity, RestoreEnti
             ATTR_BOOST_ACTIVE: self.controller.boost_active,
             ATTR_BOOST_REMAINING: self.controller.boost_remaining_minutes,
             ATTR_POWER: self.controller.power,
+            ATTR_FROST_ACTIVE: self.controller.frost_active,
             ATTR_ACTIVE_SENSORS: self.controller.temperature.active,
             ATTR_STALE_SENSORS: self.controller.temperature.stale,
         }

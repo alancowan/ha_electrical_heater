@@ -565,3 +565,97 @@ async def test_sauna_heats_to_high_target(hass: HomeAssistant) -> None:
     assert hass.states.get(CLIMATE).attributes["temperature"] == 90
     assert hass.states.get(CLIMATE).attributes["max_temp"] == 100
     assert hass.states.get(SWITCH).state == "on"
+
+
+async def _set_temp(hass: HomeAssistant, value: float) -> None:
+    hass.states.async_set(TEMP1, str(value)); hass.states.async_set(TEMP2, str(value))
+    await hass.async_block_till_done()
+
+
+async def test_frost_protection_default_is_12(hass: HomeAssistant) -> None:
+    """New heaters get frost protection at 12°."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"name": "Office heater", "heater_switch": SWITCH, "power_sensor": POWER},
+    )
+    defaults = {
+        str(key): key.default() for key in result["data_schema"].schema if callable(key.default)
+    }
+    assert defaults["frost_protection_temp"] == 12.0
+
+
+async def test_frost_protection_in_off_mode(hass: HomeAssistant) -> None:
+    """In mode off the heater keeps the room at frost temp, using the tolerances."""
+    await _setup(hass, temps=(15.0, 15.0))  # no frost setting: default 12 applies
+    assert hass.states.get(CLIMATE).state == "off"
+    assert hass.states.get(SWITCH).state == "off"
+
+    await _set_temp(hass, 11.8)  # inside the band (12 - 0.3)
+    assert hass.states.get(SWITCH).state == "off"
+    await _set_temp(hass, 11.7)
+    assert hass.states.get(SWITCH).state == "on"
+    state = hass.states.get(CLIMATE)
+    assert state.state == "off"
+    assert state.attributes["frost_protection_active"] is True
+    assert state.attributes["hvac_action"] == "idle"  # no power drawn yet
+
+    await _set_temp(hass, 12.2)  # still below 12 + 0.3: keeps heating
+    assert hass.states.get(SWITCH).state == "on"
+    await _set_temp(hass, 12.3)
+    assert hass.states.get(SWITCH).state == "off"
+    assert hass.states.get(CLIMATE).attributes["frost_protection_active"] is False
+
+
+async def test_frost_protection_leaves_hand_use_alone(hass: HomeAssistant) -> None:
+    """Above frost temp, mode off still lets the switch be used by hand."""
+    await _setup(hass, temps=(15.0, 15.0))
+    await _flip_by_hand(hass, "on")
+    await _set_temp(hass, 16.0)
+    assert hass.states.get(SWITCH).state == "on"
+
+
+async def test_frost_protection_wins_over_hand_off(hass: HomeAssistant) -> None:
+    """Switching off at the device while it's freezing: heater comes back on."""
+    await _setup(hass, temps=(10.0, 10.0), manual_boost_minutes=30.0)
+    await _set_mode(hass, "off")
+    assert hass.states.get(SWITCH).state == "on"
+    await _flip_by_hand(hass, "off")
+    assert hass.states.get(SWITCH).state == "on"
+
+
+async def test_frost_protection_sensor_failure_turns_off(hass: HomeAssistant) -> None:
+    """No usable temperature: frost protection stops and the heater goes off."""
+    await _setup(hass, temps=(10.0, 10.0))
+    assert hass.states.get(SWITCH).state == "on"
+    hass.states.async_set(TEMP1, "unavailable"); hass.states.async_set(TEMP2, "unavailable")
+    await hass.async_block_till_done()
+    assert hass.states.get(SWITCH).state == "off"
+
+
+async def test_frost_protection_disabled_with_zero(hass: HomeAssistant) -> None:
+    """Frost temp 0 turns the feature off: mode off stays off when cold."""
+    await _setup(hass, temps=(5.0, 5.0), frost_protection_temp=0.0)
+    assert hass.states.get(SWITCH).state == "off"
+    assert hass.states.get(CLIMATE).attributes["frost_protection_active"] is False
+
+
+async def test_frost_protection_per_heater(hass: HomeAssistant) -> None:
+    """Each heater has its own frost temperature."""
+    await _setup(hass, temps=(14.0, 14.0), frost_protection_temp=15.0)
+    assert hass.states.get(SWITCH).state == "on"
+
+
+async def test_frost_protection_after_boost(hass: HomeAssistant, freezer) -> None:
+    """When a boost ends in mode off and it's cold, frost protection keeps heating."""
+    await _setup(hass, temps=(10.0, 10.0))
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": BOOST, "value": 10}, blocking=True
+    )
+    freezer.tick(timedelta(minutes=10, seconds=1))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get(BOOST).state == "0"
+    assert hass.states.get(SWITCH).state == "on"

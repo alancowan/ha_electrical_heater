@@ -42,6 +42,8 @@ CONF_MIN_CYCLE_MINUTES = "min_cycle_minutes"  # Minimum time between switch togg
 CONF_MAX_BOOST_MINUTES = "max_boost_minutes"  # Upper limit of the boost slider
 # Minutes of boost started when the switch is turned on by hand (0 = off)
 CONF_MANUAL_BOOST_MINUTES = "manual_boost_minutes"
+# In mode OFF, keep the room at least this warm (0 = frost protection off)
+CONF_FROST_TEMP = "frost_protection_temp"
 
 # --- Defaults ---------------------------------------------------------------
 DEFAULT_NAME = "Electrical Heater"
@@ -56,6 +58,7 @@ DEFAULT_STALE_HOURS = 3
 DEFAULT_MIN_CYCLE_MINUTES = 0
 DEFAULT_MAX_BOOST_MINUTES = 60
 DEFAULT_MANUAL_BOOST_MINUTES = 0
+DEFAULT_FROST_TEMP = 12.0
 
 # Hard limits enforced by the config flow
 MAX_STALE_HOURS = 24
@@ -78,6 +81,7 @@ ATTR_CO2 = "co2"
 ATTR_BOOST_REMAINING = "boost_remaining_minutes"
 ATTR_BOOST_ACTIVE = "boost_active"
 ATTR_POWER = "power"
+ATTR_FROST_ACTIVE = "frost_protection_active"
 ATTR_ACTIVE_SENSORS = "active_temperature_sensors"
 ATTR_STALE_SENSORS = "stale_temperature_sensors"
 ATTR_UNAVAILABLE_SENSORS = "unavailable_temperature_sensors"

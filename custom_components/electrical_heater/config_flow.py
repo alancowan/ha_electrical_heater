@@ -30,6 +30,7 @@ from .const import (
     CONF_CO2_SENSOR,
     CONF_COLD_TOLERANCE,
     CONF_DEFAULT_TARGET,
+    CONF_FROST_TEMP,
     CONF_HEATER_SWITCH,
     CONF_HOT_TOLERANCE,
     CONF_HUMIDITY_SENSORS,
@@ -44,6 +45,7 @@ from .const import (
     CONF_TEMP_SENSORS,
     CONF_TEMP_STEP,
     DEFAULT_COLD_TOLERANCE,
+    DEFAULT_FROST_TEMP,
     DEFAULT_HOT_TOLERANCE,
     DEFAULT_MANUAL_BOOST_MINUTES,
     DEFAULT_MAX_BOOST_MINUTES,
@@ -142,6 +144,7 @@ def settings_schema(current: dict[str, Any]) -> vol.Schema:
                 )
             ),
             vol.Required(CONF_DEFAULT_TARGET, default=default(CONF_DEFAULT_TARGET, DEFAULT_TARGET_TEMP)): _number(0, MAX_SETTABLE_TEMP, 0.5, "°"),
+            vol.Required(CONF_FROST_TEMP, default=default(CONF_FROST_TEMP, DEFAULT_FROST_TEMP)): _number(0, MAX_SETTABLE_TEMP, 0.5, "°"),
             vol.Required(CONF_COLD_TOLERANCE, default=default(CONF_COLD_TOLERANCE, DEFAULT_COLD_TOLERANCE)): _number(0, MAX_TOLERANCE, 0.1, "°"),
             vol.Required(CONF_HOT_TOLERANCE, default=default(CONF_HOT_TOLERANCE, DEFAULT_HOT_TOLERANCE)): _number(0, MAX_TOLERANCE, 0.1, "°"),
             vol.Required(CONF_POWER_THRESHOLD, default=default(CONF_POWER_THRESHOLD, DEFAULT_POWER_THRESHOLD)): _number(0, 10000, 1, "W"),
